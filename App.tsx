@@ -1,0 +1,273 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { DishLibrary } from './components/DishLibrary';
+import { MealCreator } from './components/MealCreator';
+import { MealCard } from './components/MealCard';
+import { Dish, MealPlan, MealPlanAnalysis } from './types';
+import { exportToExcel } from './services/excelService';
+import { Plus, Download, ChefHat, LayoutGrid, List } from 'lucide-react';
+
+// Data from image
+const INITIAL_DISHES: Dish[] = [
+  { id: '1', name: '馋嘴土豆片', price: 29, cost: 5.8 },
+  { id: '2', name: '撒娇辣子鸡', price: 58, cost: 13.85 },
+  { id: '3', name: '手打鱼丸', price: 58, cost: 14.75 },
+  { id: '4', name: '外婆红烧肉', price: 68, cost: 18.05 },
+  { id: '5', name: '云南油焖鸡', price: 68, cost: 19.5 },
+  { id: '6', name: '麻辣干锅鸭头', price: 78, cost: 23 },
+  { id: '7', name: '手撕包菜', price: 22, cost: 6.6 },
+  { id: '8', name: '梅菜扣肉', price: 48, cost: 14.65 },
+  { id: '9', name: '静小静炒鸡', price: 68, cost: 21.8 },
+  { id: '10', name: '有机花菜', price: 18, cost: 6 },
+  { id: '11', name: '泉水玉米饭', price: 3, cost: 1 },
+  { id: '12', name: '小炒黄牛肉', price: 58, cost: 19.8 },
+  { id: '13', name: '超级海鲜桶（小份）', price: 98, cost: 35.5 },
+  { id: '14', name: '海鲜毛血旺（小份）', price: 68, cost: 25 },
+  { id: '15', name: '银耳汤', price: 5, cost: 1.85 },
+  { id: '16', name: '小米虾滑', price: 38, cost: 14.5 },
+  { id: '17', name: '蛋黄焗玉米', price: 22, cost: 8.5 },
+  { id: '18', name: '螺丝椒炒云南土腊肠', price: 38, cost: 14.85 },
+  { id: '19', name: '黑鸭煲', price: 42, cost: 16.5 },
+  { id: '20', name: '辣子鸡', price: 58, cost: 22.8 },
+  { id: '21', name: '清蒸蟹（大份）', price: 198, cost: 78 },
+  { id: '22', name: '秘制蟹（小份）', price: 105, cost: 41.5 },
+  { id: '23', name: '爆炒卤肥肠', price: 56, cost: 22.18 },
+  { id: '24', name: '秘制虾尾', price: 108, cost: 42.95 },
+  { id: '25', name: '招牌巴厘香蟹（大份）', price: 198, cost: 79.5 },
+  { id: '26', name: '山楂小排', price: 68, cost: 27.5 },
+  { id: '27', name: '梅干菜烧鸡爪', price: 56, cost: 22.8 },
+  { id: '28', name: '蒜蓉粉丝虾', price: 48, cost: 19.55 },
+  { id: '29', name: '沸腾鱼（小份）', price: 62, cost: 25.5 },
+  { id: '30', name: '秘制蟹（大份）', price: 198, cost: 83 },
+  { id: '31', name: '花生煲鸡爪', price: 56, cost: 23.5 },
+  { id: '32', name: '金汤肥牛（大份）', price: 98, cost: 41.8 },
+  { id: '33', name: '柠檬酸菜鱼（大份）', price: 90, cost: 38.5 },
+  { id: '34', name: '清蒸蟹（小份）', price: 105, cost: 45.5 },
+  { id: '35', name: '吮指猪蹄', price: 68, cost: 29.8 },
+  { id: '36', name: '沸腾鱼（大份）', price: 90, cost: 39.5 },
+  { id: '37', name: '超级海鲜桶（大份）', price: 168, cost: 74 },
+  { id: '38', name: '脱骨金沙带鱼（小份）', price: 49, cost: 21.75 },
+  { id: '39', name: '酱汁笋尖', price: 32, cost: 14.5 },
+  { id: '40', name: '胶原海笋', price: 15, cost: 6.85 },
+  { id: '41', name: '干锅鹿茸菌', price: 48, cost: 22.5 },
+  { id: '42', name: '西红柿炖牛腩', price: 68, cost: 32 },
+  { id: '43', name: '黄焖山羊排', price: 78, cost: 36.8 },
+  { id: '44', name: '脱骨金沙带鱼（大份）', price: 90, cost: 43.15 },
+  { id: '45', name: '泼辣肥牛', price: 78, cost: 39.2 },
+  { id: '46', name: '招牌巴厘香蟹（小份）', price: 105, cost: 54 },
+  { id: '47', name: '蒜蓉油麦菜', price: 16, cost: 8.35 },
+  { id: '48', name: '蒜蓉深海黄鱼', price: 22, cost: 14.45 }
+];
+
+const INITIAL_MEALS: MealPlan[] = [
+  { 
+    id: 'm1', 
+    name: '超值双人餐 (示例)', 
+    dishIds: ['2', '12', '10', '11'], 
+    standardPrice: 128, 
+    promoPrice1: 99, 
+    promoPrice2: 88 
+  }
+];
+
+export default function App() {
+  const [dishes, setDishes] = useState<Dish[]>(INITIAL_DISHES);
+  const [meals, setMeals] = useState<MealPlan[]>(INITIAL_MEALS);
+  const [isCreatorOpen, setIsCreatorOpen] = useState(false);
+  const [editingMeal, setEditingMeal] = useState<MealPlan | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  useEffect(() => {
+    // Ensuring libraries are loaded if possible
+  }, []);
+
+  // Derived State: Calculate analytics for all meals
+  const analyzedMeals: MealPlanAnalysis[] = useMemo(() => {
+    return meals.map(meal => {
+      let totalCost = 0;
+      let totalOriginalPrice = 0;
+
+      meal.dishIds.forEach(id => {
+        const dish = dishes.find(d => d.id === id);
+        if (dish) {
+          totalCost += dish.cost || 0;
+          totalOriginalPrice += dish.price || 0;
+        }
+      });
+
+      const calcMargin = (price: number, cost: number) => {
+        if (price <= 0) return 0;
+        return ((price - cost) / price) * 100;
+      };
+
+      return {
+        ...meal,
+        totalCost,
+        totalOriginalPrice,
+        standardProfit: meal.standardPrice - totalCost,
+        standardMargin: calcMargin(meal.standardPrice, totalCost),
+        promoProfit1: meal.promoPrice1 - totalCost,
+        promoMargin1: calcMargin(meal.promoPrice1, totalCost),
+        promoProfit2: meal.promoPrice2 - totalCost,
+        promoMargin2: calcMargin(meal.promoPrice2, totalCost),
+      };
+    });
+  }, [meals, dishes]);
+
+  const handleAddDish = (name: string, cost: number, price?: number) => {
+    const newDish: Dish = {
+      id: Date.now().toString(),
+      name,
+      cost,
+      price
+    };
+    setDishes([newDish, ...dishes]);
+  };
+
+  const handleDeleteDish = (id: string) => {
+    if (meals.some(m => m.dishIds.includes(id))) {
+      alert("无法删除：该菜品已被包含在现有套餐中，请先修改或删除对应套餐。");
+      return;
+    }
+    setDishes(dishes.filter(d => d.id !== id));
+  };
+
+  const handleSaveMeal = (mealData: Omit<MealPlan, 'id'>) => {
+    if (editingMeal) {
+      // Update existing
+      setMeals(meals.map(m => m.id === editingMeal.id ? { ...mealData, id: editingMeal.id } : m));
+    } else {
+      // Create new
+      const newMeal: MealPlan = {
+        ...mealData,
+        id: Date.now().toString(),
+      };
+      setMeals([newMeal, ...meals]);
+    }
+    closeCreator();
+  };
+
+  const openCreatorForEdit = (meal: MealPlan) => {
+    setEditingMeal(meal);
+    setIsCreatorOpen(true);
+  };
+
+  const closeCreator = () => {
+    setIsCreatorOpen(false);
+    setEditingMeal(null);
+  }
+
+  const handleDeleteMeal = (id: string) => {
+    if (window.confirm("确定要删除这个套餐方案吗?")) {
+      setMeals(meals.filter(m => m.id !== id));
+    }
+  };
+
+  const handleExport = () => {
+    exportToExcel(analyzedMeals, dishes);
+  };
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800 font-sans">
+      
+      {/* Sidebar: Dish Library */}
+      <aside className="w-80 flex-shrink-0 border-r border-slate-200 bg-white z-10 hidden md:block">
+        <div className="h-full p-4">
+          <DishLibrary 
+            dishes={dishes} 
+            onAddDish={handleAddDish} 
+            onDeleteDish={handleDeleteDish}
+          />
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col h-full relative overflow-hidden">
+        
+        {/* Header */}
+        <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm z-20">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-lg shadow-slate-900/20">
+              <ChefHat className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">MarginMaster</h1>
+              <p className="text-xs text-slate-500 font-medium">餐饮团购毛利测算系统</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+             {/* View Toggles (Visual only for now) */}
+             <div className="hidden sm:flex bg-slate-100 p-1 rounded-lg border border-slate-200 mr-2">
+                <button 
+                  onClick={() => setViewMode('grid')}
+                  className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  <List className="w-4 h-4" />
+                </button>
+             </div>
+
+            <button 
+              onClick={handleExport}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-accent hover:border-accent transition-all active:scale-95"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">导出 Excel</span>
+            </button>
+            <button 
+              onClick={() => setIsCreatorOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-accent hover:bg-emerald-600 rounded-lg shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>新建套餐</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar relative">
+          
+          {/* Empty State */}
+          {meals.length === 0 && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 pointer-events-none">
+              <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                <ChefHat className="w-10 h-10 opacity-20" />
+              </div>
+              <p className="text-lg font-medium">还没有创建任何套餐</p>
+              <p className="text-sm">点击右上角 "新建套餐" 开始测算</p>
+            </div>
+          )}
+
+          {/* Grid Layout */}
+          <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
+            {analyzedMeals.map(meal => (
+              <MealCard 
+                key={meal.id} 
+                meal={meal} 
+                dishes={dishes}
+                onDelete={handleDeleteMeal}
+                onEdit={openCreatorForEdit}
+              />
+            ))}
+          </div>
+        </div>
+
+      </main>
+
+      {/* Modal */}
+      {isCreatorOpen && (
+        <MealCreator 
+          dishes={dishes}
+          initialData={editingMeal}
+          onSave={handleSaveMeal}
+          onCancel={closeCreator}
+        />
+      )}
+    </div>
+  );
+}

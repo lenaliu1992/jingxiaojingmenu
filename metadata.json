@@ -1,0 +1,5 @@
+{
+  "name": "菜品毛利计算",
+  "description": "A professional tool for calculating gross margins for set meals and group buy packages. Features cost analysis, multi-tier pricing strategies (Standard, Flash Sale 1 & 2), and detailed Excel export for offline decision making.",
+  "requestFramePermissions": []
+}
