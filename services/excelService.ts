@@ -173,11 +173,13 @@ export const exportToExcel = (meals: MealPlanAnalysis[], dishes: Dish[]) => {
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "套餐菜品明细");
 
-  // 6. 生成文件名（使用日期）
-  const date = new Date().toISOString().split('T')[0];
+  // 6. 生成文件名（使用日期+时间戳）
+  const now = new Date();
+  const date = now.toISOString().split('T')[0];
+  const time = now.toTimeString().split(' ')[0].replace(/:/g, '-');
 
   // 7. 导出文件
-  XLSX.writeFile(workbook, `菜品毛利分析_${date}.xlsx`);
+  XLSX.writeFile(workbook, `菜品毛利分析_${date}_${time}.xlsx`);
 };
 
 // ==================== 导入功能 ====================
