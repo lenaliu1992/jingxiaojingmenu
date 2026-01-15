@@ -5,10 +5,11 @@ import { MealCard } from './components/MealCard';
 import { ImportResultDialog } from './components/ImportResultDialog';
 import { DataPersistenceControls } from './components/DataPersistenceControls';
 import { LoadResultDialog } from './components/LoadResultDialog';
+import { DishImportResultDialog } from './components/DishImportResultDialog';
 import { Dish, MealPlan, MealPlanAnalysis, ImportResult, LoadResult } from './types';
-import { exportToExcel, importFromExcel } from './services/excelService';
+import { exportToExcel, importFromExcel, importDishesFromExcel } from './services/excelService';
 import { exportToJson, importFromJson as importDataFromJson, mergeData } from './services/dataPersistenceService';
-import { Plus, Download, Upload, ChefHat, LayoutGrid, List } from 'lucide-react';
+import { Plus, Download, Upload, ChefHat, LayoutGrid, List, RefreshCw } from 'lucide-react';
 
 // Data from image
 const INITIAL_DISHES: Dish[] = [
@@ -95,6 +96,11 @@ export default function App() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
   const [loadResult, setLoadResult] = useState<{ result: LoadResult; fileName: string } | null>(null);
+  const [dishImportResult, setDishImportResult] = useState<{
+    success: boolean;
+    dishCount: number;
+    errors: string[];
+  } | null>(null);
 
   useEffect(() => {
     // Ensuring libraries are loaded if possible
@@ -281,18 +287,63 @@ export default function App() {
     e.target.value = '';
   };
 
+  // 导入菜品库
+  const handleImportDishes = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const result = await importDishesFromExcel(file);
+
+    setDishImportResult({
+      success: result.success,
+      dishCount: result.dishes.length,
+      errors: result.errors,
+    });
+
+    if (result.success && result.dishes.length > 0) {
+      // 完全替换菜品库
+      setDishes(result.dishes);
+      // 清空套餐（因为菜品 ID 可能已变化）
+      setMeals([]);
+      setHasUnsavedChanges(true);
+    }
+
+    // 重置文件输入
+    e.target.value = '';
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800 font-sans">
       
       {/* Sidebar: Dish Library */}
       <aside className="w-80 flex-shrink-0 border-r border-slate-200 bg-white z-10 hidden md:block">
-        <div className="h-full p-4">
-          <DishLibrary
-            dishes={dishes}
-            onAddDish={handleAddDish}
-            onDeleteDish={handleDeleteDish}
-            onUpdateDish={handleUpdateDish}
-          />
+        <div className="h-full p-4 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-slate-700">菜品库</h2>
+            <button
+              onClick={() => document.getElementById('dish-import-input')?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
+              title="从 Excel 导入菜品"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>导入</span>
+            </button>
+            <input
+              id="dish-import-input"
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleImportDishes}
+            />
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <DishLibrary
+              dishes={dishes}
+              onAddDish={handleAddDish}
+              onDeleteDish={handleDeleteDish}
+              onUpdateDish={handleUpdateDish}
+            />
+          </div>
         </div>
       </aside>
 
@@ -420,6 +471,16 @@ export default function App() {
           result={loadResult.result}
           fileName={loadResult.fileName}
           onClose={() => setLoadResult(null)}
+        />
+      )}
+
+      {/* Dish Import Result Dialog */}
+      {dishImportResult && (
+        <DishImportResultDialog
+          success={dishImportResult.success}
+          dishCount={dishImportResult.dishCount}
+          errors={dishImportResult.errors}
+          onClose={() => setDishImportResult(null)}
         />
       )}
     </div>

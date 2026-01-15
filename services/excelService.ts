@@ -428,3 +428,85 @@ export const importFromExcel = async (
     };
   }
 };
+
+// ==================== 菜品导入功能 ====================
+
+/**
+ * 从 Excel 文件导入菜品库
+ * 完全替换现有菜品库
+ */
+export const importDishesFromExcel = async (file: File): Promise<{
+  success: boolean;
+  dishes: Dish[];
+  errors: string[];
+}> => {
+  try {
+    // 1. 读取文件
+    const arrayBuffer = await file.arrayBuffer();
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+    if (workbook.SheetNames.length === 0) {
+      return {
+        success: false,
+        dishes: [],
+        errors: ['Excel 文件中没有工作表'],
+      };
+    }
+
+    // 2. 读取第一个工作表
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    if (rawData.length === 0) {
+      return {
+        success: false,
+        dishes: [],
+        errors: ['工作表中没有数据'],
+      };
+    }
+
+    // 3. 解析菜品数据（跳过表头）
+    const dishes: Dish[] = [];
+    const errors: string[] = [];
+
+    // 从第2行开始（第1行是表头）
+    for (let rowIdx = 1; rowIdx < rawData.length; rowIdx++) {
+      const row = rawData[rowIdx];
+      const [name, price, cost] = row;
+
+      // 跳过空行
+      if (!name || name.trim() === '') {
+        continue;
+      }
+
+      // 验证必需字段
+      if (price === undefined || cost === undefined) {
+        errors.push(`第 ${rowIdx + 1} 行: 菜品 "${name}" 缺少售价或成本`);
+        continue;
+      }
+
+      // 创建菜品对象
+      const dish: Dish = {
+        id: Date.now().toString() + Math.random().toString(36).substring(2, 11),
+        name: name.trim(),
+        price: Number(price) || 0,
+        cost: Number(cost) || 0,
+      };
+
+      dishes.push(dish);
+    }
+
+    // 4. 返回结果
+    return {
+      success: errors.length === 0 || dishes.length > 0,
+      dishes,
+      errors,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      dishes: [],
+      errors: [`文件解析错误: ${error instanceof Error ? error.message : '未知错误'}`],
+    };
+  }
+};
