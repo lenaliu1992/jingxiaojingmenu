@@ -10,6 +10,23 @@ import { Dish, MealPlan, MealPlanAnalysis, ImportResult, LoadResult } from './ty
 import { exportToExcel, importFromExcel, importDishesFromExcel } from './services/excelService';
 import { exportToJson, importFromJson as importDataFromJson, mergeData } from './services/dataPersistenceService';
 import { Plus, Download, Upload, ChefHat, LayoutGrid, List, RefreshCw } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // Data from image
 const INITIAL_DISHES: Dish[] = [
@@ -132,7 +149,14 @@ export default function App() {
 
   // Derived State: Calculate analytics for all meals
   const analyzedMeals: MealPlanAnalysis[] = useMemo(() => {
-    return meals.map(meal => {
+    // 按 order 字段排序，如果没有 order 则放在最后
+    const sortedMeals = [...meals].sort((a, b) => {
+      const orderA = a.order ?? 9999;
+      const orderB = b.order ?? 9999;
+      return orderA - orderB;
+    });
+
+    return sortedMeals.map(meal => {
       let totalCost = 0;
       let totalOriginalPrice = 0;
 
@@ -167,6 +191,68 @@ export default function App() {
       };
     });
   }, [meals, dishes]);
+
+  // 拖拽传感器配置
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // 处理拖拽结束
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setMeals((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+
+        // 使用 arrayMove 重新排序
+        const newItems = arrayMove(items, oldIndex, newIndex);
+
+        // 更新每个套餐的 order 字段
+        return newItems.map((item, index) => ({
+          ...item,
+          order: index,
+        }));
+      });
+
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  // 创建可排序的套餐卡片组件
+  const SortableMealCard = ({ meal, index }: { meal: MealPlanAnalysis; index: number }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+    } = useSortable({ id: meal.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    };
+
+    return (
+      <div ref={setNodeRef} style={style}>
+        <MealCard
+          meal={meal}
+          dishes={dishes}
+          onDelete={handleDeleteMeal}
+          onEdit={openCreatorForEdit}
+          dragHandleProps={{
+            ...attributes,
+            ...listeners,
+          }}
+        />
+      </div>
+    );
+  };
 
   const handleAddDish = (name: string, cost: number, price?: number) => {
     const newDish: Dish = {
@@ -432,17 +518,26 @@ export default function App() {
           )}
 
           {/* Grid Layout */}
-          <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
-            {analyzedMeals.map(meal => (
-              <MealCard 
-                key={meal.id} 
-                meal={meal} 
-                dishes={dishes}
-                onDelete={handleDeleteMeal}
-                onEdit={openCreatorForEdit}
-              />
-            ))}
-          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={analyzedMeals.map(meal => meal.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
+                {analyzedMeals.map((meal, index) => (
+                  <SortableMealCard
+                    key={meal.id}
+                    meal={meal}
+                    index={index}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         </div>
 
       </main>

@@ -12,6 +12,7 @@ export interface MealPlan {
   standardPrice: number;
   promoPrice1: number;
   promoPrice2?: number; // 可选，undefined 表示未设置
+  order?: number; // 排序顺序（可选）
 }
 
 export interface MealPlanAnalysis extends MealPlan {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Edit, AlertTriangle } from 'lucide-react';
+import { Trash2, Edit, AlertTriangle, GripVertical } from 'lucide-react';
 import { MealPlanAnalysis, Dish } from '../types';
 
 interface MealCardProps {
@@ -7,9 +7,10 @@ interface MealCardProps {
   dishes: Dish[];
   onDelete: (id: string) => void;
   onEdit: (meal: MealPlanAnalysis) => void;
+  dragHandleProps?: any; // 拖拽手柄的props
 }
 
-export const MealCard: React.FC<MealCardProps> = ({ meal, dishes, onDelete, onEdit }) => {
+export const MealCard: React.FC<MealCardProps> = ({ meal, dishes, onDelete, onEdit, dragHandleProps }) => {
   // Group dishes by ID to count quantities
   // Fixed: Removed generic type argument from reduce to avoid "Untyped function calls" error.
   // Using 'as Record<string, number>' on the initial value ensures correct type inference.
@@ -38,13 +39,22 @@ export const MealCard: React.FC<MealCardProps> = ({ meal, dishes, onDelete, onEd
           </div>
         </div>
         <div className="flex gap-1">
-          <button 
+          {dragHandleProps && (
+            <button
+              {...dragHandleProps}
+              className="text-slate-300 hover:text-slate-600 hover:bg-slate-100 p-2 rounded-lg transition-colors cursor-grab active:cursor-grabbing"
+              title="拖拽排序"
+            >
+              <GripVertical className="w-4 h-4" />
+            </button>
+          )}
+          <button
             onClick={() => onEdit(meal)}
             className="text-slate-300 hover:text-blue-500 hover:bg-blue-50 p-2 rounded-lg transition-colors"
           >
             <Edit className="w-4 h-4" />
           </button>
-          <button 
+          <button
             onClick={() => onDelete(meal.id)}
             className="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition-colors"
           >
