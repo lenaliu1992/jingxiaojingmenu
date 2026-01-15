@@ -2,9 +2,13 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { DishLibrary } from './components/DishLibrary';
 import { MealCreator } from './components/MealCreator';
 import { MealCard } from './components/MealCard';
-import { Dish, MealPlan, MealPlanAnalysis } from './types';
-import { exportToExcel } from './services/excelService';
-import { Plus, Download, ChefHat, LayoutGrid, List } from 'lucide-react';
+import { ImportResultDialog } from './components/ImportResultDialog';
+import { DataPersistenceControls } from './components/DataPersistenceControls';
+import { LoadResultDialog } from './components/LoadResultDialog';
+import { Dish, MealPlan, MealPlanAnalysis, ImportResult, LoadResult } from './types';
+import { exportToExcel, importFromExcel } from './services/excelService';
+import { exportToJson, importFromJson as importDataFromJson, mergeData } from './services/dataPersistenceService';
+import { Plus, Download, Upload, ChefHat, LayoutGrid, List } from 'lucide-react';
 
 // Data from image
 const INITIAL_DISHES: Dish[] = [
@@ -75,10 +79,41 @@ export default function App() {
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
   const [editingMeal, setEditingMeal] = useState<MealPlan | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [importDialog, setImportDialog] = useState<{
+    show: boolean;
+    result: ImportResult | null;
+  }>({ show: false, result: null });
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
+  const [loadResult, setLoadResult] = useState<{ result: LoadResult; fileName: string } | null>(null);
 
   useEffect(() => {
     // Ensuring libraries are loaded if possible
   }, []);
+
+  // 追踪数据变更
+  useEffect(() => {
+    setHasUnsavedChanges(true);
+  }, [dishes, meals]);
+
+  // 页面关闭提示
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // 更新页面标题
+  useEffect(() => {
+    const prefix = hasUnsavedChanges ? '* ' : '';
+    document.title = `${prefix}MarginMaster - 餐饮团购毛利测算系统`;
+  }, [hasUnsavedChanges]);
 
   // Derived State: Calculate analytics for all meals
   const analyzedMeals: MealPlanAnalysis[] = useMemo(() => {
@@ -131,6 +166,14 @@ export default function App() {
     setDishes(dishes.filter(d => d.id !== id));
   };
 
+  const handleUpdateDish = (id: string, name: string, cost: number, price?: number) => {
+    setDishes(dishes.map(d =>
+      d.id === id
+        ? { ...d, name, cost, price }
+        : d
+    ));
+  };
+
   const handleSaveMeal = (mealData: Omit<MealPlan, 'id'>) => {
     if (editingMeal) {
       // Update existing
@@ -166,16 +209,75 @@ export default function App() {
     exportToExcel(analyzedMeals, dishes);
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 调用导入函数
+    const result = await importFromExcel(file, dishes);
+
+    // 显示结果对话框
+    setImportDialog({ show: true, result });
+
+    // 如果成功，添加套餐
+    if (result.success && result.meals.length > 0) {
+      const newMeals: MealPlan[] = result.meals.map(meal => ({
+        ...meal,
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      }));
+
+      setMeals([...newMeals, ...meals]);
+    }
+
+    // 重置文件输入
+    e.target.value = '';
+  };
+
+  // 保存数据到本地文件
+  const handleSaveData = () => {
+    exportToJson(dishes, meals);
+    setHasUnsavedChanges(false);
+    setLastSaveTime(new Date());
+  };
+
+  // 从本地文件加载数据
+  const handleLoadData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const result = await importDataFromJson(file);
+
+    setLoadResult({ result, fileName: file.name });
+
+    if (result.success && result.data) {
+      // 合并数据
+      const { dishes: mergedDishes, meals: mergedMeals } = mergeData(
+        INITIAL_DISHES,
+        result.data.data.dishes,
+        INITIAL_MEALS,
+        result.data.data.meals
+      );
+
+      setDishes(mergedDishes);
+      setMeals(mergedMeals);
+      setHasUnsavedChanges(false);
+    }
+
+    // 重置文件输入
+    e.target.value = '';
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800 font-sans">
       
       {/* Sidebar: Dish Library */}
       <aside className="w-80 flex-shrink-0 border-r border-slate-200 bg-white z-10 hidden md:block">
         <div className="h-full p-4">
-          <DishLibrary 
-            dishes={dishes} 
-            onAddDish={handleAddDish} 
+          <DishLibrary
+            dishes={dishes}
+            onAddDish={handleAddDish}
             onDeleteDish={handleDeleteDish}
+            onUpdateDish={handleUpdateDish}
           />
         </div>
       </aside>
@@ -198,13 +300,13 @@ export default function App() {
           <div className="flex items-center gap-3">
              {/* View Toggles (Visual only for now) */}
              <div className="hidden sm:flex bg-slate-100 p-1 rounded-lg border border-slate-200 mr-2">
-                <button 
+                <button
                   onClick={() => setViewMode('grid')}
                   className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
                 >
                   <LayoutGrid className="w-4 h-4" />
                 </button>
-                <button 
+                <button
                   onClick={() => setViewMode('list')}
                   className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
                 >
@@ -212,13 +314,34 @@ export default function App() {
                 </button>
              </div>
 
-            <button 
+            <button
               onClick={handleExport}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-accent hover:border-accent transition-all active:scale-95"
             >
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">导出 Excel</span>
             </button>
+            <button
+              onClick={() => document.getElementById('excel-upload-input')?.click()}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-blue-600 hover:border-blue-600 transition-all active:scale-95"
+            >
+              <Upload className="w-4 h-4" />
+              <span className="hidden sm:inline">导入 Excel</span>
+            </button>
+            <input
+              id="excel-upload-input"
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleImport}
+            />
+
+            {/* Data Persistence Controls */}
+            <DataPersistenceControls
+              hasUnsavedChanges={hasUnsavedChanges}
+              onSave={handleSaveData}
+              onLoad={handleLoadData}
+            />
             <button 
               onClick={() => setIsCreatorOpen(true)}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-accent hover:bg-emerald-600 rounded-lg shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95"
@@ -261,11 +384,28 @@ export default function App() {
 
       {/* Modal */}
       {isCreatorOpen && (
-        <MealCreator 
+        <MealCreator
           dishes={dishes}
           initialData={editingMeal}
           onSave={handleSaveMeal}
           onCancel={closeCreator}
+        />
+      )}
+
+      {/* Import Result Dialog */}
+      {importDialog.show && importDialog.result && (
+        <ImportResultDialog
+          result={importDialog.result}
+          onClose={() => setImportDialog({ show: false, result: null })}
+        />
+      )}
+
+      {/* Load Result Dialog */}
+      {loadResult && (
+        <LoadResultDialog
+          result={loadResult.result}
+          fileName={loadResult.fileName}
+          onClose={() => setLoadResult(null)}
         />
       )}
     </div>
