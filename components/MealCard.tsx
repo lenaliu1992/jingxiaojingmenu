@@ -77,7 +77,7 @@ export const MealCard: React.FC<MealCardProps> = ({ meal, dishes, onDelete, onEd
         )}
 
         {/* Promo 2 */}
-        {meal.promoPrice2 > 0 && (
+        {meal.promoPrice2 !== undefined && meal.promoPrice2 > 0 && (
            <div className="col-span-2 flex justify-between items-center py-2 bg-amber-50/50 rounded-lg px-3 -mx-2">
              <div className="flex flex-col">
                 <span className="text-xs text-amber-400">秒杀价 2</span>
@@ -86,7 +86,9 @@ export const MealCard: React.FC<MealCardProps> = ({ meal, dishes, onDelete, onEd
              {/* Profit Removed */}
              <div className="flex flex-col text-right">
                 <span className="text-xs text-amber-400">毛利率</span>
-                <span className={`font-bold text-lg ${meal.promoMargin2 < 15 ? 'text-rose-500' : 'text-amber-600'}`}>{meal.promoMargin2.toFixed(1)}%</span>
+                <span className={`font-bold text-lg ${meal.promoMargin2 !== undefined && meal.promoMargin2 < 15 ? 'text-rose-500' : 'text-amber-600'}`}>
+                  {meal.promoMargin2 !== undefined ? meal.promoMargin2.toFixed(1) : '-'}%
+                </span>
              </div>
            </div>
         )}

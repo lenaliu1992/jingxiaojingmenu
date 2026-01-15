@@ -100,6 +100,14 @@ export const importFromJson = async (file: File): Promise<LoadResult> => {
       return { success: false, errors };
     }
 
+    // 迁移旧数据：将 promoPrice2 === 0 转换为 undefined
+    if (jsonData.data && jsonData.data.meals) {
+      jsonData.data.meals = jsonData.data.meals.map((meal: any) => ({
+        ...meal,
+        promoPrice2: (meal.promoPrice2 || 0) > 0 ? meal.promoPrice2 : undefined,
+      }));
+    }
+
     return { success: true, data: jsonData };
   } catch (error) {
     return {

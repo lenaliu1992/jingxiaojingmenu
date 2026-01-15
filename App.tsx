@@ -62,16 +62,25 @@ const INITIAL_DISHES: Dish[] = [
   { id: '48', name: '蒜蓉深海黄鱼', price: 22, cost: 14.45 }
 ];
 
-const INITIAL_MEALS: MealPlan[] = [
-  { 
-    id: 'm1', 
-    name: '超值双人餐 (示例)', 
-    dishIds: ['2', '12', '10', '11'], 
-    standardPrice: 128, 
-    promoPrice1: 99, 
-    promoPrice2: 88 
+// 数据迁移函数：将旧数据中 promoPrice2 === 0 的转为 undefined
+const migrateMealData = (meals: MealPlan[]): MealPlan[] => {
+  return meals.map(meal => ({
+    ...meal,
+    // 如果 promoPrice2 为 0 或不存在，设为 undefined
+    promoPrice2: (meal.promoPrice2 || 0) > 0 ? meal.promoPrice2 : undefined,
+  }));
+};
+
+const INITIAL_MEALS: MealPlan[] = migrateMealData([
+  {
+    id: 'm1',
+    name: '超值双人餐 (示例)',
+    dishIds: ['2', '12', '10', '11'],
+    standardPrice: 128,
+    promoPrice1: 99,
+    promoPrice2: 88
   }
-];
+]);
 
 export default function App() {
   const [dishes, setDishes] = useState<Dish[]>(INITIAL_DISHES);
@@ -142,8 +151,13 @@ export default function App() {
         standardMargin: calcMargin(meal.standardPrice, totalCost),
         promoProfit1: meal.promoPrice1 - totalCost,
         promoMargin1: calcMargin(meal.promoPrice1, totalCost),
-        promoProfit2: meal.promoPrice2 - totalCost,
-        promoMargin2: calcMargin(meal.promoPrice2, totalCost),
+        // 只有当 promoPrice2 存在时才计算相关指标
+        promoProfit2: meal.promoPrice2 !== undefined
+          ? meal.promoPrice2 - totalCost
+          : undefined,
+        promoMargin2: meal.promoPrice2 !== undefined
+          ? calcMargin(meal.promoPrice2, totalCost)
+          : undefined,
       };
     });
   }, [meals, dishes]);

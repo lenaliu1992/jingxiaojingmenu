@@ -14,17 +14,23 @@ export const MealCreator: React.FC<MealCreatorProps> = ({ dishes, initialData, o
   // Map of DishID -> Quantity
   const [selectedDishes, setSelectedDishes] = useState<Map<string, number>>(new Map());
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const [promoPrice1, setPromoPrice1] = useState<number | ''>('');
-  const [promoPrice2, setPromoPrice2] = useState<number | ''>('');
+  const [promoPrice2, setPromoPrice2] = useState<number | '' | undefined>('');
 
   // Initialize state if editing
   useEffect(() => {
     if (initialData) {
       setName(initialData.name);
       setPromoPrice1(initialData.promoPrice1);
-      setPromoPrice2(initialData.promoPrice2);
-      
+
+      // 处理可选的 promoPrice2
+      if (initialData.promoPrice2 !== undefined) {
+        setPromoPrice2(initialData.promoPrice2);
+      } else {
+        setPromoPrice2(undefined); // 明确设为 undefined
+      }
+
       // Reconstruct dish map from flat array
       const dishMap = new Map<string, number>();
       initialData.dishIds.forEach(id => {
@@ -104,9 +110,12 @@ export const MealCreator: React.FC<MealCreatorProps> = ({ dishes, initialData, o
     onSave({
       name,
       dishIds,
-      standardPrice: 0, 
+      standardPrice: 0,
       promoPrice1: Number(promoPrice1) || 0,
-      promoPrice2: Number(promoPrice2) || 0,
+      // 只有当用户输入了有效值时才保存，否则为 undefined
+      promoPrice2: promoPrice2 !== undefined && promoPrice2 !== ''
+        ? Number(promoPrice2)
+        : undefined,
     });
   };
 
@@ -298,25 +307,43 @@ export const MealCreator: React.FC<MealCreatorProps> = ({ dishes, initialData, o
                 {/* Promo Price 2 */}
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
                    <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/10 rounded-bl-full -mr-8 -mt-8"></div>
-                  <label className="block text-sm font-bold text-amber-700 mb-2">秒杀价 2</label>
+                  <label className="block text-sm font-bold text-amber-700 mb-2">秒杀价 2（可选）</label>
                   <div className="flex gap-4 items-center">
                     <div className="flex-1 relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">¥</span>
                       <input
                         type="number"
-                        value={promoPrice2}
-                        onChange={(e) => setPromoPrice2(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                        value={promoPrice2 ?? ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          // 允许输入空字符串，这将转换为 undefined
+                          setPromoPrice2(value === '' ? undefined : parseFloat(value));
+                        }}
+                        onBlur={(e) => {
+                          // 失去焦点时，如果值为空，设为 undefined
+                          if (e.target.value === '') {
+                            setPromoPrice2(undefined);
+                          }
+                        }}
                         className="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none"
-                        placeholder="0.00"
+                        placeholder="留空表示不设置"
                       />
                     </div>
                     <div className="text-right flex flex-col gap-1">
-                      <span className={`text-xl font-bold font-mono ${calculateMargin(promoPrice2) < 15 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                        {calculateMargin(promoPrice2).toFixed(1)}%
-                      </span>
-                      {promoPrice2 && totalOriginalPrice > 0 && (
-                        <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                          {calculateDiscount(promoPrice2).toFixed(1)}折
+                      {promoPrice2 !== undefined && promoPrice2 !== '' ? (
+                        <>
+                          <span className={`text-xl font-bold font-mono ${calculateMargin(promoPrice2) < 15 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                            {calculateMargin(promoPrice2).toFixed(1)}%
+                          </span>
+                          {promoPrice2 && totalOriginalPrice > 0 && (
+                            <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                              {calculateDiscount(promoPrice2).toFixed(1)}折
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-sm text-slate-400 italic">
+                          未设置
                         </span>
                       )}
                     </div>

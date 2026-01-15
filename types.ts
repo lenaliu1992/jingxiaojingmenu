@@ -11,7 +11,7 @@ export interface MealPlan {
   dishIds: string[]; // References Dish.id
   standardPrice: number;
   promoPrice1: number;
-  promoPrice2: number;
+  promoPrice2?: number; // 可选，undefined 表示未设置
 }
 
 export interface MealPlanAnalysis extends MealPlan {
@@ -19,10 +19,10 @@ export interface MealPlanAnalysis extends MealPlan {
   totalOriginalPrice: number; // Sum of dish.price
   standardMargin: number; // percentage
   promoMargin1: number; // percentage
-  promoMargin2: number; // percentage
+  promoMargin2?: number; // percentage，可选
   standardProfit: number;
   promoProfit1: number;
-  promoProfit2: number;
+  promoProfit2?: number; // 可选
 }
 
 export interface CalculatedDish extends Dish {
