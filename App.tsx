@@ -125,13 +125,7 @@ export default function App() {
     dishCount: number;
     errors: string[];
   } | null>(null);
-
-  // 从 API 加载初始数据
-  useEffect(() => {
-    if (useApi) {
-      loadFromApi();
-    }
-  }, [useApi]);
+  const [isImportingDishes, setIsImportingDishes] = useState(false);
 
   const loadFromApi = async () => {
     try {
@@ -156,6 +150,14 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  // 从 API 加载初始数据
+  useEffect(() => {
+    if (useApi) {
+      loadFromApi();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 追踪数据变更
   useEffect(() => {
@@ -556,42 +558,79 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const result = await importDishesFromExcel(file);
+    // 开始导入
+    setIsImportingDishes(true);
+    setDishImportResult(null); // 清除之前的结果
 
-    setDishImportResult({
-      success: result.success,
-      dishCount: result.dishes.length,
-      errors: result.errors,
-    });
+    try {
+      // 步骤 1: 解析 Excel
+      const excelResult = await importDishesFromExcel(file);
 
-    if (result.success && result.dishes.length > 0) {
+      // 如果 Excel 解析失败，立即显示错误
+      if (!excelResult.success || excelResult.dishes.length === 0) {
+        setDishImportResult({
+          success: false,
+          dishCount: 0,
+          errors: excelResult.errors,
+        });
+        return;
+      }
+
+      // 步骤 2: 保存到后端/存储
       if (useApi) {
-        // API 模式：批量创建菜品
+        // API 模式：先保存再显示成功
         try {
           const createdDishes = await dishesApi.batchCreate(
-            result.dishes.map(d => ({
+            excelResult.dishes.map(d => ({
               name: d.name,
               cost: d.cost,
               price: d.price,
             }))
           );
+
+          // 只有 API 成功后才显示成功弹窗
           setDishes(createdDishes);
-          // 清空套餐（因为菜品 ID 可能已变化）
           setMeals([]);
+          setDishImportResult({
+            success: true,
+            dishCount: createdDishes.length,
+            errors: [],
+          });
         } catch (err: any) {
-          alert(`导入菜品失败: ${err.message}`);
+          // API 失败：显示详细错误，而不是成功
+          setDishImportResult({
+            success: false,
+            dishCount: 0,
+            errors: [
+              `Excel 解析成功（${excelResult.dishes.length} 个菜品），但保存到服务器失败`,
+              `错误详情: ${err.message || '未知错误'}`,
+              '请检查网络连接或联系管理员'
+            ],
+          });
         }
       } else {
-        // 本地模式：直接替换
-        setDishes(result.dishes);
-        // 清空套餐（因为菜品 ID 可能已变化）
+        // 本地模式：立即显示成功（因为没有 API 调用）
+        setDishes(excelResult.dishes);
         setMeals([]);
         setHasUnsavedChanges(true);
+        setDishImportResult({
+          success: true,
+          dishCount: excelResult.dishes.length,
+          errors: [],
+        });
       }
+    } catch (err: any) {
+      // 捕获意外错误
+      setDishImportResult({
+        success: false,
+        dishCount: 0,
+        errors: [`导入过程发生错误: ${err.message || '未知错误'}`],
+      });
+    } finally {
+      // 总是清除加载状态和文件输入
+      setIsImportingDishes(false);
+      e.target.value = '';
     }
-
-    // 重置文件输入
-    e.target.value = '';
   };
 
   return (
@@ -603,12 +642,21 @@ export default function App() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-bold text-slate-700">菜品库</h2>
             <button
-              onClick={() => document.getElementById('dish-import-input')?.click()}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-all"
-              title="从 Excel 导入菜品"
+              onClick={() => {
+                if (!isImportingDishes) {
+                  document.getElementById('dish-import-input')?.click();
+                }
+              }}
+              disabled={isImportingDishes}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                isImportingDishes
+                  ? 'text-slate-400 bg-slate-100 cursor-not-allowed'
+                  : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
+              }`}
+              title={isImportingDishes ? '正在导入...' : '从 Excel 导入菜品'}
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>导入</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${isImportingDishes ? 'animate-spin' : ''}`} />
+              <span>{isImportingDishes ? '导入中...' : '导入'}</span>
             </button>
             <input
               id="dish-import-input"
