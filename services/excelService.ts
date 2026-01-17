@@ -51,27 +51,27 @@ const transformMealsToExcelRows = (
 
       const subtotal = (dish.price || 0) * quantity;
 
-      // 基础行数据
+      // 基础行数据 - 添加 null 检查
       const baseRow: ExcelRowBase = {
         套餐名称: meal.name,
         菜品名称: dish.name,
         菜品单价: dish.price ? `¥${dish.price.toFixed(2)}` : '-',
-        菜品成本: `¥${dish.cost.toFixed(2)}`,
+        菜品成本: `¥${(dish.cost || 0).toFixed(2)}`,
         数量: quantity,
         菜品小计: `¥${subtotal.toFixed(2)}`,
-        套餐原价: `¥${meal.totalOriginalPrice.toFixed(2)}`,
-        秒杀价1: `¥${meal.promoPrice1.toFixed(2)}`,
-        秒杀毛利率1: `${meal.promoMargin1.toFixed(2)}%`,
+        套餐原价: `¥${(meal.totalOriginalPrice || 0).toFixed(2)}`,
+        秒杀价1: `¥${(meal.promoPrice1 || 0).toFixed(2)}`,
+        秒杀毛利率1: `${(meal.promoMargin1 || 0).toFixed(2)}%`,
       };
 
       // 根据是否需要秒杀价2来决定添加哪些字段
       if (hasAnyPromoPrice2) {
         rows.push({
           ...baseRow,
-          秒杀价2: meal.promoPrice2 !== undefined
+          秒杀价2: meal.promoPrice2 !== undefined && meal.promoPrice2 !== null
             ? `¥${meal.promoPrice2.toFixed(2)}`
             : '-',
-          秒杀毛利率2: meal.promoPrice2 !== undefined && meal.promoMargin2 !== undefined
+          秒杀毛利率2: meal.promoPrice2 !== undefined && meal.promoPrice2 !== null && meal.promoMargin2 !== undefined && meal.promoMargin2 !== null
             ? `${meal.promoMargin2.toFixed(2)}%`
             : '-',
         } as ExcelRowWithPromo2);
@@ -90,8 +90,11 @@ const transformMealsToExcelRows = (
  * 动态判断是否包含秒杀价2列
  */
 export const exportToExcel = (meals: MealPlanAnalysis[], dishes: Dish[]) => {
+  console.log('开始导出 Excel...', { mealCount: meals.length, dishCount: dishes.length });
+
   // 1. 数据转换：将套餐数据转换为扁平化的行数据
   const rows = transformMealsToExcelRows(meals, dishes);
+  console.log('转换后的行数据:', rows);
 
   // 2. 创建工作表
   const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -179,7 +182,10 @@ export const exportToExcel = (meals: MealPlanAnalysis[], dishes: Dish[]) => {
   const time = now.toTimeString().split(' ')[0].replace(/:/g, '-');
 
   // 7. 导出文件
-  XLSX.writeFile(workbook, `菜品毛利分析_${date}_${time}.xlsx`);
+  const fileName = `菜品毛利分析_${date}_${time}.xlsx`;
+  console.log('正在导出文件:', fileName);
+  XLSX.writeFile(workbook, fileName);
+  console.log('导出完成!');
 };
 
 // ==================== 导入功能 ====================

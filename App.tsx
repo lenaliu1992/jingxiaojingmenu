@@ -9,6 +9,7 @@ import { DishImportResultDialog } from './components/DishImportResultDialog';
 import { Dish, MealPlan, MealPlanAnalysis, ImportResult, LoadResult } from './types';
 import { exportToExcel, importFromExcel, importDishesFromExcel } from './services/excelService';
 import { exportToJson, importFromJson as importDataFromJson, mergeData } from './services/dataPersistenceService';
+import { dishesApi, mealsApi } from './services/api';
 import { Plus, Download, Upload, ChefHat, LayoutGrid, List, RefreshCw } from 'lucide-react';
 import {
   DndContext,
@@ -101,6 +102,12 @@ const INITIAL_MEALS: MealPlan[] = migrateMealData([
 ]);
 
 export default function App() {
+  // API 配置
+  const useApi = import.meta.env.VITE_USE_API === 'true';
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // 数据状态
   const [dishes, setDishes] = useState<Dish[]>(INITIAL_DISHES);
   const [meals, setMeals] = useState<MealPlan[]>(INITIAL_MEALS);
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
@@ -119,9 +126,36 @@ export default function App() {
     errors: string[];
   } | null>(null);
 
+  // 从 API 加载初始数据
   useEffect(() => {
-    // Ensuring libraries are loaded if possible
-  }, []);
+    if (useApi) {
+      loadFromApi();
+    }
+  }, [useApi]);
+
+  const loadFromApi = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [dishesData, mealsData] = await Promise.all([
+        dishesApi.getAll(),
+        mealsApi.getAll(),
+      ]);
+
+      // API 层已经处理了字段名转换，直接使用
+      setDishes(dishesData);
+      setMeals(mealsData);
+      setHasUnsavedChanges(false);
+    } catch (err: any) {
+      console.error('加载数据失败:', err);
+      setError(err.message);
+      // 如果 API 失败，回退到本地数据
+      setDishes(INITIAL_DISHES);
+      setMeals(INITIAL_MEALS);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // 追踪数据变更
   useEffect(() => {
@@ -201,25 +235,37 @@ export default function App() {
   );
 
   // 处理拖拽结束
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      setMeals((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
+      const oldIndex = meals.findIndex((item) => item.id === active.id);
+      const newIndex = meals.findIndex((item) => item.id === over.id);
 
-        // 使用 arrayMove 重新排序
-        const newItems = arrayMove(items, oldIndex, newIndex);
+      // 乐观更新：先更新 UI
+      const newItems = arrayMove(meals, oldIndex, newIndex);
+      const reorderedMeals = newItems.map((item, index) => ({
+        ...item,
+        order: index,
+      }));
+      setMeals(reorderedMeals);
 
-        // 更新每个套餐的 order 字段
-        return newItems.map((item, index) => ({
-          ...item,
-          order: index,
-        }));
-      });
-
-      setHasUnsavedChanges(true);
+      // 同步到后端
+      if (useApi) {
+        try {
+          const mealOrders = reorderedMeals.map(m => ({
+            id: m.id,
+            sort_order: m.order || 0,
+          }));
+          await mealsApi.reorder(mealOrders);
+        } catch (err: any) {
+          alert(`排序失败: ${err.message}`);
+          // 回滚到原状态
+          setMeals(meals);
+        }
+      } else {
+        setHasUnsavedChanges(true);
+      }
     }
   };
 
@@ -254,45 +300,106 @@ export default function App() {
     );
   };
 
-  const handleAddDish = (name: string, cost: number, price?: number) => {
-    const newDish: Dish = {
-      id: Date.now().toString(),
-      name,
-      cost,
-      price
-    };
-    setDishes([newDish, ...dishes]);
+  const handleAddDish = async (name: string, cost: number, price?: number) => {
+    if (useApi) {
+      try {
+        const newDish = await dishesApi.create({ name, cost, price });
+        setDishes([newDish, ...dishes]);
+      } catch (err: any) {
+        alert(`创建菜品失败: ${err.message}`);
+      }
+    } else {
+      const newDish: Dish = {
+        id: Date.now().toString(),
+        name,
+        cost,
+        price
+      };
+      setDishes([newDish, ...dishes]);
+    }
   };
 
-  const handleDeleteDish = (id: string) => {
+  const handleDeleteDish = async (id: string) => {
     if (meals.some(m => m.dishIds.includes(id))) {
       alert("无法删除：该菜品已被包含在现有套餐中，请先修改或删除对应套餐。");
       return;
     }
-    setDishes(dishes.filter(d => d.id !== id));
-  };
-
-  const handleUpdateDish = (id: string, name: string, cost: number, price?: number) => {
-    setDishes(dishes.map(d =>
-      d.id === id
-        ? { ...d, name, cost, price }
-        : d
-    ));
-  };
-
-  const handleSaveMeal = (mealData: Omit<MealPlan, 'id'>) => {
-    if (editingMeal) {
-      // Update existing
-      setMeals(meals.map(m => m.id === editingMeal.id ? { ...mealData, id: editingMeal.id } : m));
+    if (useApi) {
+      try {
+        await dishesApi.delete(id);
+        setDishes(dishes.filter(d => d.id !== id));
+      } catch (err: any) {
+        alert(`删除菜品失败: ${err.message}`);
+      }
     } else {
-      // Create new
-      const newMeal: MealPlan = {
-        ...mealData,
-        id: Date.now().toString(),
-      };
-      setMeals([newMeal, ...meals]);
+      setDishes(dishes.filter(d => d.id !== id));
     }
-    closeCreator();
+  };
+
+  const handleUpdateDish = async (id: string, name: string, cost: number, price?: number) => {
+    if (useApi) {
+      try {
+        const updatedDish = await dishesApi.update(id, { name, cost, price });
+        // API 返回的数据格式已经是正确的（Dish 类型），直接使用
+        setDishes(dishes.map(d =>
+          d.id === id ? updatedDish : d
+        ));
+      } catch (err: any) {
+        alert(`更新菜品失败: ${err.message}`);
+      }
+    } else {
+      setDishes(dishes.map(d =>
+        d.id === id
+          ? { ...d, name, cost, price }
+          : d
+      ));
+    }
+  };
+
+  const handleSaveMeal = async (mealData: Omit<MealPlan, 'id'>) => {
+    if (useApi) {
+      try {
+        if (editingMeal) {
+          // Update existing
+          const updatedMeal = await mealsApi.update(editingMeal.id, {
+            name: mealData.name,
+            dish_ids: mealData.dishIds,
+            standard_price: mealData.standardPrice,
+            promo_price1: mealData.promoPrice1,
+            promo_price2: mealData.promoPrice2,
+            sort_order: mealData.order,
+          });
+          setMeals(meals.map(m => m.id === editingMeal.id ? updatedMeal : m));
+        } else {
+          // Create new
+          const newMeal = await mealsApi.create({
+            name: mealData.name,
+            dish_ids: mealData.dishIds,
+            standard_price: mealData.standardPrice,
+            promo_price1: mealData.promoPrice1,
+            promo_price2: mealData.promoPrice2,
+            sort_order: mealData.order,
+          });
+          setMeals([newMeal, ...meals]);
+        }
+        closeCreator();
+      } catch (err: any) {
+        alert(`保存套餐失败: ${err.message}`);
+      }
+    } else {
+      if (editingMeal) {
+        // Update existing
+        setMeals(meals.map(m => m.id === editingMeal.id ? { ...mealData, id: editingMeal.id } : m));
+      } else {
+        // Create new
+        const newMeal: MealPlan = {
+          ...mealData,
+          id: Date.now().toString(),
+        };
+        setMeals([newMeal, ...meals]);
+      }
+      closeCreator();
+    }
   };
 
   const openCreatorForEdit = (meal: MealPlan) => {
@@ -305,14 +412,32 @@ export default function App() {
     setEditingMeal(null);
   }
 
-  const handleDeleteMeal = (id: string) => {
+  const handleDeleteMeal = async (id: string) => {
     if (window.confirm("确定要删除这个套餐方案吗?")) {
-      setMeals(meals.filter(m => m.id !== id));
+      if (useApi) {
+        try {
+          await mealsApi.delete(id);
+          setMeals(meals.filter(m => m.id !== id));
+        } catch (err: any) {
+          alert(`删除套餐失败: ${err.message}`);
+        }
+      } else {
+        setMeals(meals.filter(m => m.id !== id));
+      }
     }
   };
 
   const handleExport = () => {
-    exportToExcel(analyzedMeals, dishes);
+    if (analyzedMeals.length === 0) {
+      alert('没有套餐数据可以导出，请先创建套餐');
+      return;
+    }
+    try {
+      exportToExcel(analyzedMeals, dishes);
+    } catch (error) {
+      alert(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      console.error('导出错误:', error);
+    }
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -327,12 +452,33 @@ export default function App() {
 
     // 如果成功，添加套餐
     if (result.success && result.meals.length > 0) {
-      const newMeals: MealPlan[] = result.meals.map(meal => ({
-        ...meal,
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      }));
-
-      setMeals([...newMeals, ...meals]);
+      if (useApi) {
+        // API 模式：逐个保存到数据库
+        try {
+          const createdMeals: MealPlan[] = [];
+          for (const meal of result.meals) {
+            const createdMeal = await mealsApi.create({
+              name: meal.name,
+              dish_ids: meal.dishIds,
+              standard_price: meal.standardPrice,
+              promo_price1: meal.promoPrice1,
+              promo_price2: meal.promoPrice2,
+              sort_order: meal.order || 0,
+            });
+            createdMeals.push(createdMeal);
+          }
+          setMeals([...createdMeals, ...meals]);
+        } catch (err: any) {
+          alert(`导入套餐失败: ${err.message}`);
+        }
+      } else {
+        // 本地模式：直接添加到状态
+        const newMeals: MealPlan[] = result.meals.map(meal => ({
+          ...meal,
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        }));
+        setMeals([...newMeals, ...meals]);
+      }
     }
 
     // 重置文件输入
@@ -364,9 +510,41 @@ export default function App() {
         result.data.data.meals
       );
 
-      setDishes(mergedDishes);
-      setMeals(mergedMeals);
-      setHasUnsavedChanges(false);
+      if (useApi) {
+        // API 模式：保存到数据库
+        try {
+          // 批量创建菜品
+          await dishesApi.batchCreate(
+            mergedDishes.map(d => ({
+              name: d.name,
+              cost: d.cost,
+              price: d.price,
+            }))
+          );
+
+          // 批量创建套餐
+          for (const meal of mergedMeals) {
+            await mealsApi.create({
+              name: meal.name,
+              dish_ids: meal.dishIds,
+              standard_price: meal.standardPrice,
+              promo_price1: meal.promoPrice1,
+              promo_price2: meal.promoPrice2,
+              sort_order: meal.order || 0,
+            });
+          }
+
+          // 重新加载数据
+          await loadFromApi();
+        } catch (err: any) {
+          alert(`加载数据失败: ${err.message}`);
+        }
+      } else {
+        // 本地模式：直接更新状态
+        setDishes(mergedDishes);
+        setMeals(mergedMeals);
+        setHasUnsavedChanges(false);
+      }
     }
 
     // 重置文件输入
@@ -387,11 +565,29 @@ export default function App() {
     });
 
     if (result.success && result.dishes.length > 0) {
-      // 完全替换菜品库
-      setDishes(result.dishes);
-      // 清空套餐（因为菜品 ID 可能已变化）
-      setMeals([]);
-      setHasUnsavedChanges(true);
+      if (useApi) {
+        // API 模式：批量创建菜品
+        try {
+          const createdDishes = await dishesApi.batchCreate(
+            result.dishes.map(d => ({
+              name: d.name,
+              cost: d.cost,
+              price: d.price,
+            }))
+          );
+          setDishes(createdDishes);
+          // 清空套餐（因为菜品 ID 可能已变化）
+          setMeals([]);
+        } catch (err: any) {
+          alert(`导入菜品失败: ${err.message}`);
+        }
+      } else {
+        // 本地模式：直接替换
+        setDishes(result.dishes);
+        // 清空套餐（因为菜品 ID 可能已变化）
+        setMeals([]);
+        setHasUnsavedChanges(true);
+      }
     }
 
     // 重置文件输入

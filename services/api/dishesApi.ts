@@ -1,0 +1,81 @@
+import { apiClient } from './client';
+import { Dish } from '../types';
+
+export interface CreateDishRequest {
+  name: string;
+  cost: number;
+  price?: number;
+}
+
+export interface UpdateDishRequest {
+  name?: string;
+  cost?: number;
+  price?: number;
+}
+
+// 转换 snake_case 到 camelCase
+const toCamelCase = (obj: any): any => {
+  if (obj === null || typeof obj !== 'object') return obj;
+
+  if (Array.isArray(obj)) {
+    return obj.map(toCamelCase);
+  }
+
+  const result: any = {};
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      result[camelKey] = toCamelCase(obj[key]);
+    }
+  }
+  return result;
+};
+
+export const dishesApi = {
+  /**
+   * 获取所有菜品
+   */
+  getAll: async (options?: { includeDeleted?: boolean; search?: string }): Promise<Dish[]> => {
+    const response = await apiClient.get('/dishes', { params: options });
+    return response.data.map(toCamelCase);
+  },
+
+  /**
+   * 获取单个菜品
+   */
+  getById: async (id: string): Promise<Dish> => {
+    const response = await apiClient.get(`/dishes/${id}`);
+    return toCamelCase(response.data);
+  },
+
+  /**
+   * 创建菜品
+   */
+  create: async (data: CreateDishRequest): Promise<Dish> => {
+    const response = await apiClient.post('/dishes', data);
+    return toCamelCase(response.data);
+  },
+
+  /**
+   * 更新菜品
+   */
+  update: async (id: string, data: UpdateDishRequest): Promise<Dish> => {
+    const response = await apiClient.put(`/dishes/${id}`, data);
+    return toCamelCase(response.data);
+  },
+
+  /**
+   * 删除菜品
+   */
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/dishes/${id}`);
+  },
+
+  /**
+   * 批量创建菜品
+   */
+  batchCreate: async (dishes: CreateDishRequest[]): Promise<Dish[]> => {
+    const response = await apiClient.post('/dishes/batch', { dishes });
+    return response.data.map(toCamelCase);
+  },
+};
