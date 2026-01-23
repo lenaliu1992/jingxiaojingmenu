@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { Dish } from '../types';
+import { Dish, DuplicateCheckResult, BatchImportResult } from '../types';
 
 export interface CreateDishRequest {
   name: string;
@@ -77,5 +77,26 @@ export const dishesApi = {
   batchCreate: async (dishes: CreateDishRequest[]): Promise<Dish[]> => {
     const response = await apiClient.post('/dishes/batch', { dishes });
     return response.data.map(toCamelCase);
+  },
+
+  /**
+   * 检查菜品是否重复
+   */
+  checkDuplicate: async (name: string, excludeId?: string): Promise<DuplicateCheckResult> => {
+    const response = await apiClient.post('/dishes/check-duplicate', { name, excludeId });
+    return toCamelCase(response.data);
+  },
+
+  /**
+   * 批量导入菜品（支持重复处理策略）
+   */
+  batchImport: async (
+    request: {
+      dishes: CreateDishRequest[];
+      strategy: 'skip' | 'update' | 'create_all';
+    }
+  ): Promise<BatchImportResult> => {
+    const response = await apiClient.post('/dishes/batch/import', request);
+    return toCamelCase(response.data);
   },
 };

@@ -443,9 +443,17 @@ export const importFromExcel = async (
  * 从 Excel 文件导入菜品库
  * 完全替换现有菜品库
  */
-export const importDishesFromExcel = async (file: File): Promise<{
+export const importDishesFromExcel = async (
+  file: File,
+  existingDishes: Dish[] = []
+): Promise<{
   success: boolean;
   dishes: Dish[];
+  duplicates: Array<{
+    name: string;
+    existing: Dish;
+    new: Omit<Dish, 'id'>;
+  }>;
   errors: string[];
 }> => {
   try {
@@ -457,6 +465,7 @@ export const importDishesFromExcel = async (file: File): Promise<{
       return {
         success: false,
         dishes: [],
+        duplicates: [],
         errors: ['Excel 文件中没有工作表'],
       };
     }
@@ -469,12 +478,24 @@ export const importDishesFromExcel = async (file: File): Promise<{
       return {
         success: false,
         dishes: [],
+        duplicates: [],
         errors: ['工作表中没有数据'],
       };
     }
 
-    // 3. 解析菜品数据（跳过表头）
+    // 3. 构建现有菜品名称索引
+    const existingDishMap = new Map<string, Dish>();
+    existingDishes.forEach((d) => {
+      existingDishMap.set(d.name.trim(), d);
+    });
+
+    // 4. 解析菜品数据（跳过表头）
     const dishes: Dish[] = [];
+    const duplicates: Array<{
+      name: string;
+      existing: Dish;
+      new: Omit<Dish, 'id'>;
+    }> = [];
     const errors: string[] = [];
 
     // 从第2行开始（第1行是表头）
@@ -493,27 +514,45 @@ export const importDishesFromExcel = async (file: File): Promise<{
         continue;
       }
 
-      // 创建菜品对象
-      const dish: Dish = {
-        id: Date.now().toString() + Math.random().toString(36).substring(2, 11),
-        name: name.trim(),
+      const normalizedName = name.trim();
+      const dishData: Omit<Dish, 'id'> = {
+        name: normalizedName,
         price: Number(price) || 0,
         cost: Number(cost) || 0,
       };
 
-      dishes.push(dish);
+      const existing = existingDishMap.get(normalizedName);
+
+      if (existing) {
+        // 重复
+        duplicates.push({
+          name: normalizedName,
+          existing,
+          new: dishData,
+        });
+      } else {
+        // 新菜品，分配ID
+        const dish: Dish = {
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 11),
+          ...dishData,
+        };
+        dishes.push(dish);
+        existingDishMap.set(normalizedName, dish); // 添加到索引，避免Excel内部的重复
+      }
     }
 
-    // 4. 返回结果
+    // 5. 返回结果
     return {
       success: errors.length === 0 || dishes.length > 0,
       dishes,
+      duplicates,
       errors,
     };
   } catch (error) {
     return {
       success: false,
       dishes: [],
+      duplicates: [],
       errors: [`文件解析错误: ${error instanceof Error ? error.message : '未知错误'}`],
     };
   }

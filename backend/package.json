@@ -8,7 +8,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "seed": "tsx src/database/seed.ts"
+    "seed": "tsx src/database/seed.ts",
+    "clean-duplicates": "tsx src/scripts/cleanDuplicatesSimple.ts"
   },
   "keywords": [
     "express",

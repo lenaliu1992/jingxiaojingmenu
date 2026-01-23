@@ -95,3 +95,25 @@ export interface LoadResult {
   errors?: ValidationError[];
   warnings?: string[];
 }
+
+// 重复检查结果
+export interface DuplicateCheckResult {
+  isDuplicate: boolean;
+  existingDish?: Dish;
+}
+
+// 导入策略
+export type DishImportStrategy = 'skip' | 'update' | 'create_all';
+
+// 批量导入结果
+export interface BatchImportResult {
+  summary: {
+    total: number;
+    created: number;
+    updated: number;
+    skipped: number;
+  };
+  created: Dish[];
+  updated: Dish[];
+  skipped: string[];
+}

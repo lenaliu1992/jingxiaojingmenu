@@ -89,3 +89,28 @@ export interface UpdateMealRequest {
 export interface ReorderMealsRequest {
   meal_orders: Array<{ id: string; sort_order: number }>;
 }
+
+// 重复检查结果
+export interface DuplicateCheckResult {
+  isDuplicate: boolean;
+  existingDish?: Dish;
+}
+
+// 批量导入请求
+export interface BatchImportRequest {
+  dishes: CreateDishRequest[];
+  strategy: 'skip' | 'update' | 'create_all';
+}
+
+// 批量导入结果
+export interface BatchImportResult {
+  summary: {
+    total: number;
+    created: number;
+    updated: number;
+    skipped: number;
+  };
+  created: Dish[];
+  updated: Dish[];
+  skipped: string[];
+}

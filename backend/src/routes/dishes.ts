@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { dishService } from '../services/dishesService.js';
-import { CreateDishRequest, UpdateDishRequest, ApiResponse } from '../types.js';
+import { CreateDishRequest, UpdateDishRequest, ApiResponse, BatchImportRequest } from '../types.js';
 
 const router = Router();
 
@@ -186,6 +186,76 @@ router.post('/batch', (req: Request, res: Response) => {
       success: false,
       error: {
         code: 'BATCH_CREATE_FAILED',
+        message: error.message,
+      },
+    });
+  }
+});
+
+// 检查菜品是否重复
+router.post('/check-duplicate', (req: Request, res: Response) => {
+  try {
+    const { name, excludeId } = req.body;
+
+    if (!name || typeof name !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_NAME',
+          message: '菜品名称无效',
+        },
+      });
+    }
+
+    const result = dishService.checkDuplicate(name, excludeId);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'CHECK_FAILED',
+        message: error.message,
+      },
+    });
+  }
+});
+
+// 批量导入菜品（支持重复处理策略）
+router.post('/batch/import', (req: Request, res: Response) => {
+  try {
+    const { dishes, strategy = 'skip' }: BatchImportRequest = req.body;
+
+    if (!Array.isArray(dishes)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_DATA',
+          message: 'dishes 必须是数组',
+        },
+      });
+    }
+
+    const result = dishService.batchCreateWithStrategy(dishes, strategy);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        summary: {
+          total: dishes.length,
+          created: result.created.length,
+          updated: result.updated.length,
+          skipped: result.skipped.length,
+        },
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'BATCH_IMPORT_FAILED',
         message: error.message,
       },
     });

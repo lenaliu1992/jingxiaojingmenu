@@ -6,6 +6,7 @@ import { ImportResultDialog } from './components/ImportResultDialog';
 import { DataPersistenceControls } from './components/DataPersistenceControls';
 import { LoadResultDialog } from './components/LoadResultDialog';
 import { DishImportResultDialog } from './components/DishImportResultDialog';
+import { DishImportStrategyDialog } from './components/DishImportStrategyDialog';
 import { Dish, MealPlan, MealPlanAnalysis, ImportResult, LoadResult } from './types';
 import { exportToExcel, importFromExcel, importDishesFromExcel } from './services/excelService';
 import { exportToJson, importFromJson as importDataFromJson, mergeData } from './services/dataPersistenceService';
@@ -126,6 +127,17 @@ export default function App() {
     errors: string[];
   } | null>(null);
   const [isImportingDishes, setIsImportingDishes] = useState(false);
+  const [importStrategyDialog, setImportStrategyDialog] = useState<{
+    show: boolean;
+    duplicateCount: number;
+    newCount: number;
+    parsedData: {
+      success: boolean;
+      dishes: Dish[];
+      duplicates: Array<{ name: string; existing: Dish; new: Omit<Dish, 'id'> }>;
+      errors: string[];
+    } | null;
+  }>({ show: false, duplicateCount: 0, newCount: 0, parsedData: null });
 
   const loadFromApi = async () => {
     try {
@@ -305,12 +317,49 @@ export default function App() {
   const handleAddDish = async (name: string, cost: number, price?: number) => {
     if (useApi) {
       try {
+        // API模式：检查重复
+        const checkResult = await dishesApi.checkDuplicate(name);
+
+        if (checkResult.isDuplicate) {
+          const existing = checkResult.existingDish!;
+          const confirmed = confirm(
+            `菜品 "${name}" 已存在！\n\n` +
+            `现有菜品:\n` +
+            `- 原价: ¥${existing.price || '-'}\n` +
+            `- 成本: ¥${existing.cost}\n\n` +
+            `新菜品:\n` +
+            `- 原价: ¥${price || '-'}\n` +
+            `- 成本: ¥${cost}\n\n` +
+            `是否仍要创建新菜品？`
+          );
+
+          if (!confirmed) return;
+        }
+
         const newDish = await dishesApi.create({ name, cost, price });
         setDishes([newDish, ...dishes]);
       } catch (err: any) {
         alert(`创建菜品失败: ${err.message}`);
       }
     } else {
+      // 本地模式：在本地state中检查
+      const existing = dishes.find(d => d.name.trim() === name.trim());
+
+      if (existing) {
+        const confirmed = confirm(
+          `菜品 "${name}" 已存在！\n\n` +
+          `现有菜品:\n` +
+          `- 原价: ¥${existing.price || '-'}\n` +
+          `- 成本: ¥${existing.cost}\n\n` +
+          `新菜品:\n` +
+          `- 原价: ¥${price || '-'}\n` +
+          `- 成本: ¥${cost}\n\n` +
+          `是否仍要创建新菜品？`
+        );
+
+        if (!confirmed) return;
+      }
+
       const newDish: Dish = {
         id: Date.now().toString(),
         name,
@@ -318,6 +367,7 @@ export default function App() {
         price
       };
       setDishes([newDish, ...dishes]);
+      setHasUnsavedChanges(true);
     }
   };
 
@@ -563,8 +613,8 @@ export default function App() {
     setDishImportResult(null); // 清除之前的结果
 
     try {
-      // 步骤 1: 解析 Excel
-      const excelResult = await importDishesFromExcel(file);
+      // 步骤 1: 解析 Excel（传入现有菜品列表以检测重复）
+      const excelResult = await importDishesFromExcel(file, dishes);
 
       // 如果 Excel 解析失败，立即显示错误
       if (!excelResult.success || excelResult.dishes.length === 0) {
@@ -573,52 +623,27 @@ export default function App() {
           dishCount: 0,
           errors: excelResult.errors,
         });
+        setIsImportingDishes(false);
+        e.target.value = '';
         return;
       }
 
-      // 步骤 2: 保存到后端/存储
-      if (useApi) {
-        // API 模式：先保存再显示成功
-        try {
-          const createdDishes = await dishesApi.batchCreate(
-            excelResult.dishes.map(d => ({
-              name: d.name,
-              cost: d.cost,
-              price: d.price,
-            }))
-          );
-
-          // 只有 API 成功后才显示成功弹窗
-          setDishes(createdDishes);
-          setMeals([]);
-          setDishImportResult({
-            success: true,
-            dishCount: createdDishes.length,
-            errors: [],
-          });
-        } catch (err: any) {
-          // API 失败：显示详细错误，而不是成功
-          setDishImportResult({
-            success: false,
-            dishCount: 0,
-            errors: [
-              `Excel 解析成功（${excelResult.dishes.length} 个菜品），但保存到服务器失败`,
-              `错误详情: ${err.message || '未知错误'}`,
-              '请检查网络连接或联系管理员'
-            ],
-          });
-        }
-      } else {
-        // 本地模式：立即显示成功（因为没有 API 调用）
-        setDishes(excelResult.dishes);
-        setMeals([]);
-        setHasUnsavedChanges(true);
-        setDishImportResult({
-          success: true,
-          dishCount: excelResult.dishes.length,
-          errors: [],
+      // 步骤 2: 检查是否有重复
+      if (excelResult.duplicates.length > 0) {
+        // 显示策略选择对话框
+        setImportStrategyDialog({
+          show: true,
+          duplicateCount: excelResult.duplicates.length,
+          newCount: excelResult.dishes.length,
+          parsedData: excelResult,
         });
+        setIsImportingDishes(false);
+        e.target.value = '';
+        return;
       }
+
+      // 步骤 3: 没有重复，直接导入
+      await executeImport(excelResult.dishes, 'skip', excelResult.duplicates);
     } catch (err: any) {
       // 捕获意外错误
       setDishImportResult({
@@ -631,6 +656,95 @@ export default function App() {
       setIsImportingDishes(false);
       e.target.value = '';
     }
+  };
+
+  // 执行导入
+  const executeImport = async (
+    newDishes: Dish[],
+    strategy: 'skip' | 'update' | 'create_all',
+    duplicates: Array<{ name: string; existing: Dish; new: Omit<Dish, 'id'> }>
+  ) => {
+    try {
+      if (useApi) {
+        // API模式
+        const allDishesData = [
+          ...newDishes.map((d) => ({ name: d.name, cost: d.cost, price: d.price })),
+          ...(strategy === 'update' || strategy === 'create_all'
+            ? duplicates.map((d) => ({ name: d.new.name, cost: d.new.cost, price: d.new.price }))
+            : []),
+        ];
+
+        const result = await dishesApi.batchImport({
+          dishes: allDishesData,
+          strategy,
+        });
+
+        const allDishes = [...result.created, ...result.updated];
+        setDishes(allDishes);
+        setMeals([]);
+
+        setDishImportResult({
+          success: true,
+          dishCount: allDishes.length,
+          errors: [],
+        });
+      } else {
+        // 本地模式
+        if (strategy === 'create_all') {
+          const allDishes = [
+            ...newDishes,
+            ...duplicates.map((d) => ({
+              ...d.new,
+              id: Date.now().toString() + Math.random().toString(36).substring(2, 11),
+            })),
+          ];
+          setDishes(allDishes);
+        } else if (strategy === 'skip') {
+          setDishes([...newDishes, ...dishes]);
+        } else if (strategy === 'update') {
+          const updateMap = new Map(duplicates.map((d) => [d.name, d.new]));
+          const merged = dishes.map((d) => {
+            const update = updateMap.get(d.name);
+            return update ? { ...d, ...update } : d;
+          });
+          setDishes([...newDishes, ...merged]);
+        }
+        setMeals([]);
+        setHasUnsavedChanges(true);
+
+        setDishImportResult({
+          success: true,
+          dishCount: newDishes.length + (strategy === 'create_all' ? duplicates.length : strategy === 'skip' ? 0 : duplicates.length),
+          errors: [],
+        });
+      }
+    } catch (err: any) {
+      setDishImportResult({
+        success: false,
+        dishCount: 0,
+        errors: [`导入失败: ${err.message || '未知错误'}`],
+      });
+    }
+  };
+
+  // 处理策略选择
+  const handleImportStrategySelect = async (strategy: 'skip' | 'update' | 'create_all') => {
+    if (!importStrategyDialog.parsedData) return;
+
+    const { dishes: newDishes, duplicates } = importStrategyDialog.parsedData;
+
+    setImportStrategyDialog({ show: false, duplicateCount: 0, newCount: 0, parsedData: null });
+
+    await executeImport(newDishes, strategy, duplicates);
+  };
+
+  const handleExportMealsTemplate = () => {
+    const template = [
+      ['套餐名称', '菜品1', '菜品2', '菜品3', '菜品4', '标准价', '促销价1', '促销价2'],
+      ['超值双人餐', '撒娇辣子鸡', '小炒黄牛肉', '有机花菜', '泉水玉米饭', 128, 99, 88],
+      ['家庭套餐', '手打鱼丸', '外婆红烧肉', '蒜蓉油麦菜', '泉水玉米饭', 168, 138, ''],
+    ];
+    exportToExcel(template, '套餐导入模板');
   };
 
   return (
@@ -820,6 +934,18 @@ export default function App() {
           dishCount={dishImportResult.dishCount}
           errors={dishImportResult.errors}
           onClose={() => setDishImportResult(null)}
+        />
+      )}
+
+      {/* Dish Import Strategy Dialog */}
+      {importStrategyDialog.show && importStrategyDialog.parsedData && (
+        <DishImportStrategyDialog
+          duplicateCount={importStrategyDialog.duplicateCount}
+          newCount={importStrategyDialog.newCount}
+          onSelect={handleImportStrategySelect}
+          onCancel={() =>
+            setImportStrategyDialog({ show: false, duplicateCount: 0, newCount: 0, parsedData: null })
+          }
         />
       )}
     </div>
