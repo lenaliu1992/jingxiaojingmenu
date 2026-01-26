@@ -111,6 +111,35 @@ router.post('/', (req: Request, res: Response) => {
   }
 });
 
+// 批量重新排序套餐（必须在 /:id 之前定义，避免路由冲突）
+router.put('/reorder', (req: Request, res: Response) => {
+  try {
+    const { meal_orders } = req.body;
+
+    if (!Array.isArray(meal_orders)) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_DATA',
+          message: 'meal_orders 必须是数组',
+        },
+      });
+    }
+
+    mealService.reorder(meal_orders);
+
+    res.json({ success: true, data: { message: '排序已更新' } });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'REORDER_FAILED',
+        message: error.message,
+      },
+    });
+  }
+});
+
 // 更新套餐
 router.put('/:id', (req: Request, res: Response) => {
   try {
@@ -172,35 +201,6 @@ router.delete('/:id', (req: Request, res: Response) => {
       success: false,
       error: {
         code: 'DELETE_MEAL_FAILED',
-        message: error.message,
-      },
-    });
-  }
-});
-
-// 批量重新排序套餐
-router.put('/reorder', (req: Request, res: Response) => {
-  try {
-    const { meal_orders } = req.body;
-
-    if (!Array.isArray(meal_orders)) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'INVALID_DATA',
-          message: 'meal_orders 必须是数组',
-        },
-      });
-    }
-
-    mealService.reorder(meal_orders);
-
-    res.json({ success: true, data: { message: '排序已更新' } });
-  } catch (error: any) {
-    res.status(500).json({
-      success: false,
-      error: {
-        code: 'REORDER_FAILED',
         message: error.message,
       },
     });
