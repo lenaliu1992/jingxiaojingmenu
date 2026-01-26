@@ -8,7 +8,7 @@
  */
 
 import { Database } from 'sql.js';
-import { initDataBase } from '../config/database.js';
+import { initDatabase } from '../config/database.js';
 import { Dish } from '../types.js';
 
 interface DuplicateGroup {
@@ -22,7 +22,7 @@ async function cleanDuplicates() {
   console.log('开始清理重复菜品...\n');
 
   // 初始化数据库
-  const db = await initDataBase();
+  const db = await initDatabase();
   if (!db) {
     console.error('无法初始化数据库');
     process.exit(1);
@@ -40,9 +40,9 @@ async function cleanDuplicates() {
     const values = result[0].values;
 
     // 解析菜品数据
-    const allDishes: Dish[] = values.map((row) => {
+    const allDishes: Dish[] = values.map((row: any[]) => {
       const dish: any = {};
-      columns.forEach((col, index) => {
+      columns.forEach((col: string, index: number) => {
         dish[col] = row[index];
       });
       return dish as Dish;
@@ -136,9 +136,9 @@ async function cleanDuplicates() {
       const mdColumns = mealDishesResult[0].columns;
       const mdValues = mealDishesResult[0].values;
 
-      mdValues.forEach((row) => {
+      mdValues.forEach((row: any[]) => {
         const md: any = {};
-        mdColumns.forEach((col, index) => {
+        mdColumns.forEach((col: string, index: number) => {
           md[col] = row[index];
         });
 

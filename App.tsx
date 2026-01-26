@@ -7,11 +7,13 @@ import { DataPersistenceControls } from './components/DataPersistenceControls';
 import { LoadResultDialog } from './components/LoadResultDialog';
 import { DishImportResultDialog } from './components/DishImportResultDialog';
 import { DishImportStrategyDialog } from './components/DishImportStrategyDialog';
+import { ExportSelectionDialog } from './components/ExportSelectionDialog';
+import { TestNewUI } from './TestNewUI';
 import { Dish, MealPlan, MealPlanAnalysis, ImportResult, LoadResult } from './types';
 import { exportToExcel, importFromExcel, importDishesFromExcel } from './services/excelService';
 import { exportToJson, importFromJson as importDataFromJson, mergeData } from './services/dataPersistenceService';
 import { dishesApi, mealsApi } from './services/api';
-import { Plus, Download, Upload, ChefHat, LayoutGrid, List, RefreshCw } from 'lucide-react';
+import { Plus, Download, Upload, ChefHat, LayoutGrid, List, RefreshCw, Sparkles } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -103,6 +105,9 @@ const INITIAL_MEALS: MealPlan[] = migrateMealData([
 ]);
 
 export default function App() {
+  // 界面版本控制
+  const [uiVersion, setUiVersion] = useState<'old' | 'new'>('old');
+
   // API 配置
   const useApi = import.meta.env.VITE_USE_API === 'true';
   const [loading, setLoading] = useState(false);
@@ -138,6 +143,7 @@ export default function App() {
       errors: string[];
     } | null;
   }>({ show: false, duplicateCount: 0, newCount: 0, parsedData: null });
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const loadFromApi = async () => {
     try {
@@ -484,8 +490,18 @@ export default function App() {
       alert('没有套餐数据可以导出，请先创建套餐');
       return;
     }
+    // 打开选择对话框，而不是直接导出
+    setExportDialogOpen(true);
+  };
+
+  const handleExportSelected = (selectedMeals: MealPlanAnalysis[]) => {
+    if (selectedMeals.length === 0) {
+      alert('请至少选择一个套餐');
+      return;
+    }
     try {
-      exportToExcel(analyzedMeals, dishes);
+      exportToExcel(selectedMeals, dishes);
+      setExportDialogOpen(false);
     } catch (error) {
       alert(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
       console.error('导出错误:', error);
@@ -747,8 +763,37 @@ export default function App() {
     exportToExcel(template, '套餐导入模板');
   };
 
+  // 新界面版本
+  if (uiVersion === 'new') {
+    return (
+      <>
+        {/* 界面版本切换按钮 */}
+        <button
+          onClick={() => setUiVersion('old')}
+          className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 group"
+          title="切换回旧版本"
+        >
+          <Sparkles className="w-4 h-4 text-purple-500 group-hover:rotate-12 transition-transform" />
+          <span className="text-sm font-medium text-gray-700">返回旧版</span>
+        </button>
+
+        <TestNewUI />
+      </>
+    );
+  }
+
+  // 旧界面版本
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800 font-sans">
+      {/* 界面版本切换按钮 */}
+      <button
+        onClick={() => setUiVersion('new')}
+        className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 group"
+        title="体验全新界面"
+      >
+        <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+        <span className="text-sm font-medium">体验新版</span>
+      </button>
       
       {/* Sidebar: Dish Library */}
       <aside className="w-80 flex-shrink-0 border-r border-slate-200 bg-white z-10 hidden md:block">
@@ -946,6 +991,16 @@ export default function App() {
           onCancel={() =>
             setImportStrategyDialog({ show: false, duplicateCount: 0, newCount: 0, parsedData: null })
           }
+        />
+      )}
+
+      {/* Export Selection Dialog */}
+      {exportDialogOpen && (
+        <ExportSelectionDialog
+          meals={analyzedMeals}
+          dishes={dishes}
+          onExport={handleExportSelected}
+          onClose={() => setExportDialogOpen(false)}
         />
       )}
     </div>

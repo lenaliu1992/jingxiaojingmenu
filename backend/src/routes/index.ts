@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import dishesRouter from './dishes.js';
 import mealsRouter from './meals.js';
+import categoriesRouter from './categories.js';
 
 const router = Router();
 
@@ -19,6 +20,7 @@ router.get('/health', (req, res) => {
 // 挂载路由
 router.use('/dishes', dishesRouter);
 router.use('/meals', mealsRouter);
+router.use('/categories', categoriesRouter);
 
 // 重新排序路由应该在 meals 之前定义，避免冲突
 router.use('/meals/reorder', (req, res, next) => {

@@ -3,7 +3,48 @@ export interface Dish {
   name: string;
   cost: number;
   price?: number; // Original a la carte price (reference selling price)
+  categoryId?: string; // 菜品分类ID
+  category?: DishCategoryData; // 菜品分类对象（可选，关联数据）
 }
+
+// 菜品分类数据
+export interface DishCategoryData {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  description?: string;
+  sortOrder: number;
+  createdAt: number;
+  updatedAt: number;
+  source: 'initial' | 'user';
+}
+
+// 菜品分类枚举（保留用于向后兼容）
+export type DishCategory =
+  | '主食'      // 主食类
+  | '青菜'      // 青菜类
+  | '荤菜'      // 荤菜类
+  | '汤类'      // 汤类
+  | '饮品'      // 饮品类
+  | '小吃'      // 小吃类
+  | '海鲜'      // 海鲜类
+  | '其他';     // 其他
+
+// 菜品分类配置（默认配置，用于向后兼容）
+/**
+ * @deprecated 使用从API获取的分类数据
+ */
+export const DISH_CATEGORIES: Record<DishCategory, { icon: string; color: string; description: string }> = {
+  '主食': { icon: '🍚', color: '#10b981', description: '米饭、面食等主食' },
+  '青菜': { icon: '🥬', color: '#22c55e', description: '各类蔬菜菜品' },
+  '荤菜': { icon: '🍖', color: '#ef4444', description: '肉类菜品' },
+  '汤类': { icon: '🍲', color: '#f59e0b', description: '各种汤品' },
+  '饮品': { icon: '🥤', color: '#3b82f6', description: '饮料、茶水' },
+  '小吃': { icon: '🍢', color: '#8b5cf6', description: '小食、零食' },
+  '海鲜': { icon: '🦐', color: '#06b6d4', description: '海鲜类菜品' },
+  '其他': { icon: '🍽️', color: '#6b7280', description: '其他菜品' },
+};
 
 export interface MealPlan {
   id: string;

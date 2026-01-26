@@ -4,6 +4,21 @@ export interface Dish {
   name: string;
   cost: number;
   price?: number;
+  category_id?: string;
+  created_at: number;
+  updated_at: number;
+  deleted_at?: number;
+  source: 'initial' | 'user';
+}
+
+// 菜品分类类型
+export interface DishCategory {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  description?: string;
+  sort_order: number;
   created_at: number;
   updated_at: number;
   deleted_at?: number;
@@ -56,6 +71,7 @@ export interface CreateDishRequest {
   name: string;
   cost: number;
   price?: number;
+  category_id?: string;
 }
 
 // 更新菜品请求
@@ -63,6 +79,28 @@ export interface UpdateDishRequest {
   name?: string;
   cost?: number;
   price?: number;
+  category_id?: string;
+}
+
+// 创建分类请求
+export interface CreateCategoryRequest {
+  name: string;
+  icon?: string;
+  color?: string;
+  description?: string;
+}
+
+// 更新分类请求
+export interface UpdateCategoryRequest {
+  name?: string;
+  icon?: string;
+  color?: string;
+  description?: string;
+}
+
+// 删除分类请求
+export interface DeleteCategoryRequest {
+  replace_with?: string;
 }
 
 // 创建套餐请求

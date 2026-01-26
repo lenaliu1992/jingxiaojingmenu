@@ -2,6 +2,7 @@ import express, { Application } from 'express';
 import cors from 'cors';
 import { config } from 'dotenv';
 import { initDatabase, closeDatabase } from './config/database.js';
+import { migrateAddCategories } from './database/migrations/add_categories.js';
 import apiRouter from './routes/index.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
@@ -41,6 +42,13 @@ async function startServer() {
     // 初始化数据库
     await initDatabase();
     console.log('✅ 数据库已初始化');
+
+    // 运行数据库迁移
+    try {
+      await migrateAddCategories();
+    } catch (error: any) {
+      console.log('⚠️ 分类迁移已运行或失败:', error.message);
+    }
 
     // 启动 HTTP 服务器
     app.listen(PORT, () => {
