@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 
 // Excel 行数据接口（基础类型，不包含秒杀价2）
 interface ExcelRowBase {
+  序号: number;  // 新增：序号列
   套餐名称: string;
   菜品名称: string;
   菜品单价: string;
@@ -16,6 +17,7 @@ interface ExcelRowBase {
 
 // Excel 行数据接口（包含秒杀价2）
 interface ExcelRowWithPromo2 extends ExcelRowBase {
+  序号: number;  // 新增：序号列
   秒杀价2: string;
   秒杀毛利率2: string;
 }
@@ -37,7 +39,9 @@ const transformMealsToExcelRows = (
   // 判断是否需要包含秒杀价2列（只要有任何一个套餐设置了秒杀价2）
   const hasAnyPromoPrice2 = meals.some(m => m.promoPrice2 !== undefined);
 
-  meals.forEach(meal => {
+  meals.forEach((meal, mealIndex) => {
+    const serialNumber = mealIndex + 1;  // 计算序号（从1开始）
+
     // 统计菜品数量
     const dishCounts = meal.dishIds.reduce((acc, id) => {
       acc[id] = (acc[id] || 0) + 1;
@@ -53,6 +57,7 @@ const transformMealsToExcelRows = (
 
       // 基础行数据 - 添加 null 检查
       const baseRow: ExcelRowBase = {
+        序号: serialNumber,  // 新增：序号列
         套餐名称: meal.name,
         菜品名称: dish.name,
         菜品单价: dish.price ? `¥${dish.price.toFixed(2)}` : '-',
@@ -124,11 +129,11 @@ export const exportToExcel = (meals: MealPlanAnalysis[], dishes: Dish[]) => {
       const endRow = startRow + mealRowCount - 1;
 
       // 根据是否有秒杀价2来决定要合并的列索引
-      // 0-套餐名称, 6-套餐原价, 7-秒杀价1, 8-毛利率1
-      // 如果有秒杀价2：9-秒杀价2, 10-毛利率2
+      // 0-序号, 1-套餐名称, 7-套餐原价, 8-秒杀价1, 9-毛利率1
+      // 如果有秒杀价2：10-秒杀价2, 11-毛利率2
       const columnsToMerge = hasAnyPromoPrice2
-        ? [0, 6, 7, 8, 9, 10]
-        : [0, 6, 7, 8];
+        ? [0, 1, 7, 8, 9, 10, 11]  // 包含序号列（索引0）
+        : [0, 1, 7, 8, 9];          // 包含序号列（索引0）
 
       columnsToMerge.forEach(colIndex => {
         merges.push({
@@ -147,6 +152,7 @@ export const exportToExcel = (meals: MealPlanAnalysis[], dishes: Dish[]) => {
   // 5. 设置列宽（动态调整）
   const wscols = hasAnyPromoPrice2
     ? [
+        { wch: 8 },   // 序号（新增，第一列）
         { wch: 20 }, // 套餐名称
         { wch: 25 }, // 菜品名称
         { wch: 12 }, // 菜品单价
@@ -160,6 +166,7 @@ export const exportToExcel = (meals: MealPlanAnalysis[], dishes: Dish[]) => {
         { wch: 12 }, // 毛利率2
       ]
     : [
+        { wch: 8 },   // 序号（新增，第一列）
         { wch: 20 }, // 套餐名称
         { wch: 25 }, // 菜品名称
         { wch: 12 }, // 菜品单价

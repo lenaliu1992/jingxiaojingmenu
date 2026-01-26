@@ -1,0 +1,390 @@
+.meal-list-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  height: 100%;
+}
+
+/* 头部 */
+.meal-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--gray-200);
+}
+
+.header-info {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.header-info h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.meal-count {
+  font-size: 0.875rem;
+  color: var(--gray-500);
+  font-weight: 500;
+}
+
+/* 内容区 */
+.meal-list-content {
+  flex: 1;
+  overflow: auto;
+}
+
+.meal-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* 套餐项 */
+.meal-item {
+  background: white;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--gray-200);
+  overflow: hidden;
+  transition: all var(--transition);
+}
+
+.meal-item:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--gray-300);
+}
+
+.meal-item.expanded {
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px rgb(16 185 129 / 0.1);
+}
+
+/* 主行 */
+.meal-item-main {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.25rem;
+}
+
+.meal-drag-handle {
+  display: flex;
+  align-items: center;
+  color: var(--gray-400);
+  cursor: grab;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition);
+}
+
+.meal-drag-handle:hover {
+  color: var(--gray-600);
+  background: var(--gray-100);
+}
+
+.drag-icon {
+  cursor: grab;
+}
+
+.meal-expand-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--gray-500);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.meal-expand-btn:hover {
+  background: var(--gray-100);
+  color: var(--gray-700);
+}
+
+.meal-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.meal-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meal-meta {
+  display: flex;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--gray-500);
+}
+
+.dish-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* 价格区 */
+.meal-pricing {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.price-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+  min-width: 60px;
+}
+
+.price-label {
+  font-size: 0.6875rem;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  font-weight: 600;
+}
+
+.price-value {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  font-family: 'DM Sans', monospace;
+}
+
+.price-accent {
+  color: var(--primary);
+}
+
+.price-special {
+  color: var(--accent);
+}
+
+/* 毛利率 */
+.meal-margin {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  min-width: 100px;
+}
+
+.margin-badge {
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-family: 'DM Sans', monospace;
+}
+
+.margin-success {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+}
+
+.margin-warning {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.margin-danger {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.margin-detail {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.profit-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  font-family: 'DM Sans', monospace;
+}
+
+.profit-label {
+  font-size: 0.6875rem;
+  color: var(--gray-500);
+}
+
+/* 操作按钮 */
+.meal-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+/* 展开详情 */
+.meal-item-details {
+  padding: 0 1.25rem 1.25rem;
+  border-top: 1px solid var(--gray-200);
+  background: var(--gray-50);
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  padding-top: 1rem;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.detail-item.detail-full {
+  grid-column: 1 / -1;
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.detail-value {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  font-family: 'DM Sans', monospace;
+}
+
+.dish-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.dish-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  background: white;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  color: var(--gray-700);
+  font-weight: 500;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  background: white;
+  border-radius: var(--radius-lg);
+  border: 2px dashed var(--gray-300);
+  text-align: center;
+}
+
+.empty-state p {
+  font-size: 1rem;
+  color: var(--gray-700);
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+}
+
+.empty-hint {
+  font-size: 0.875rem;
+  color: var(--gray-500);
+}
+
+/* 响应式 */
+@media (max-width: 1024px) {
+  .meal-item-main {
+    grid-template-columns: auto auto 1fr;
+    gap: 0.75rem;
+  }
+
+  .meal-pricing {
+    grid-column: 2 / -1;
+    justify-content: flex-start;
+  }
+
+  .meal-margin {
+    grid-column: 3;
+    justify-content: flex-end;
+  }
+
+  .meal-actions {
+    grid-column: 3;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 768px) {
+  .meal-list-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .meal-item-main {
+    grid-template-columns: auto auto 1fr auto;
+    gap: 0.5rem;
+    padding: 0.875rem 1rem;
+  }
+
+  .meal-pricing {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .meal-margin {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  .meal-actions {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
