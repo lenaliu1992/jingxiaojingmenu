@@ -13,16 +13,22 @@ export class DishService {
    * 获取所有菜品
    */
   getAll(options: { includeDeleted?: boolean; search?: string } = {}): Dish[] {
-    let sql = 'SELECT * FROM dishes';
+    let sql = `
+      SELECT
+        d.*,
+        dc.name as category_name
+      FROM dishes d
+      LEFT JOIN dish_categories dc ON d.category_id = dc.id AND dc.deleted_at IS NULL
+    `;
     const conditions: string[] = [];
     const params: any[] = [];
 
     if (!options.includeDeleted) {
-      conditions.push('deleted_at IS NULL');
+      conditions.push('d.deleted_at IS NULL');
     }
 
     if (options.search) {
-      conditions.push('name LIKE ?');
+      conditions.push('d.name LIKE ?');
       params.push(`%${options.search}%`);
     }
 
@@ -30,7 +36,7 @@ export class DishService {
       sql += ' WHERE ' + conditions.join(' AND ');
     }
 
-    sql += ' ORDER BY name';
+    sql += ' ORDER BY d.name';
 
     return executeQuery<Dish>(sql, params);
   }
@@ -40,7 +46,14 @@ export class DishService {
    */
   getById(id: string): Dish | null {
     const results = executeQuery<Dish>(
-      'SELECT * FROM dishes WHERE id = ? AND deleted_at IS NULL',
+      `
+      SELECT
+        d.*,
+        dc.name as category_name
+      FROM dishes d
+      LEFT JOIN dish_categories dc ON d.category_id = dc.id AND dc.deleted_at IS NULL
+      WHERE d.id = ? AND d.deleted_at IS NULL
+      `,
       [id]
     );
     return results[0] || null;

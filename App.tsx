@@ -9,8 +9,8 @@ import { LoadResultDialog } from './components/LoadResultDialog';
 import { DishImportResultDialog } from './components/DishImportResultDialog';
 import { DishImportStrategyDialog } from './components/DishImportStrategyDialog';
 import { ExportSelectionDialog } from './components/ExportSelectionDialog';
-import { Dish, MealPlan, MealPlanAnalysis, ImportResult, LoadResult } from './types';
-import { exportToExcel, importFromExcel, importDishesFromExcel } from './services/excelService';
+import { Dish, MealPlan, MealPlanAnalysis, ImportResult, LoadResult, DishCategory } from './types';
+import { exportToExcel, exportMealTemplate, importFromExcel, importDishesFromExcel } from './services/excelService';
 import { exportToJson, importFromJson as importDataFromJson, mergeData } from './services/dataPersistenceService';
 import { dishesApi, mealsApi } from './services/api';
 import { Plus, Download, Upload, ChefHat, RefreshCw } from 'lucide-react';
@@ -269,7 +269,7 @@ export default function App() {
 
       // 乐观更新：先更新 UI
       const newItems = arrayMove(meals, oldIndex, newIndex);
-      const reorderedMeals = newItems.map((item, index) => ({
+      const reorderedMeals = newItems.map((item: MealPlanAnalysis, index: number) => ({
         ...item,
         order: index,
       }));
@@ -761,12 +761,7 @@ export default function App() {
   };
 
   const handleExportMealsTemplate = () => {
-    const template = [
-      ['套餐名称', '菜品1', '菜品2', '菜品3', '菜品4', '标准价', '促销价1', '促销价2'],
-      ['超值双人餐', '撒娇辣子鸡', '小炒黄牛肉', '有机花菜', '泉水玉米饭', 128, 99, 88],
-      ['家庭套餐', '手打鱼丸', '外婆红烧肉', '蒜蓉油麦菜', '泉水玉米饭', 168, 138, ''],
-    ];
-    exportToExcel(template, '套餐导入模板');
+    exportMealTemplate();
   };
 
   return (

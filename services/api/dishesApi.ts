@@ -1,5 +1,6 @@
 import { apiClient } from './client';
-import { Dish, DuplicateCheckResult, BatchImportResult } from '../types';
+import { Dish, DuplicateCheckResult, BatchImportResult } from '../../types';
+import { toCamelCase } from './utils';
 
 export interface CreateDishRequest {
   name: string;
@@ -13,24 +14,6 @@ export interface UpdateDishRequest {
   price?: number;
   category?: string; // 分类名称
 }
-
-// 转换 snake_case 到 camelCase
-const toCamelCase = (obj: any): any => {
-  if (obj === null || typeof obj !== 'object') return obj;
-
-  if (Array.isArray(obj)) {
-    return obj.map(toCamelCase);
-  }
-
-  const result: any = {};
-  for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-      result[camelKey] = toCamelCase(obj[key]);
-    }
-  }
-  return result;
-};
 
 export const dishesApi = {
   /**

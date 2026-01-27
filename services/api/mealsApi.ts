@@ -1,5 +1,6 @@
 import { apiClient } from './client';
-import { MealPlan } from '../types';
+import { MealPlan } from '../../types';
+import { toCamelCase } from './utils';
 
 export interface CreateMealRequest {
   name: string;
@@ -18,24 +19,6 @@ export interface UpdateMealRequest {
   promo_price2?: number;
   sort_order?: number;
 }
-
-// 转换 snake_case 到 camelCase
-const toCamelCase = (obj: any): any => {
-  if (obj === null || typeof obj !== 'object') return obj;
-
-  if (Array.isArray(obj)) {
-    return obj.map(toCamelCase);
-  }
-
-  const result: any = {};
-  for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-      result[camelKey] = toCamelCase(obj[key]);
-    }
-  }
-  return result;
-};
 
 export const mealsApi = {
   /**

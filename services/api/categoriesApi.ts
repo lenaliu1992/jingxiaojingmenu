@@ -1,19 +1,6 @@
 import { apiClient } from './client';
-import { DishCategoryData } from '../types';
-
-const toCamelCase = (obj: any): any => {
-  if (obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(toCamelCase);
-
-  const result: any = {};
-  for (const key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
-      result[camelKey] = toCamelCase(obj[key]);
-    }
-  }
-  return result;
-};
+import { DishCategoryData } from '../../types';
+import { toCamelCase } from './utils';
 
 export const categoriesApi = {
   getAll: async (): Promise<DishCategoryData[]> => {
