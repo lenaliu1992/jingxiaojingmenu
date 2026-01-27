@@ -5,7 +5,8 @@ import {
   saveDatabase,
   getCurrentTimestamp,
 } from '../config/database.js';
-import { Dish, CreateDishRequest, UpdateDishRequest, DuplicateCheckResult, BatchImportResult } from '../types.js';
+import { Dish, CreateDishRequest, UpdateDishRequest, DuplicateCheckResult, BatchImportResult, DishCategory } from '../types.js';
+import { CategoryService } from './categoriesService.js';
 
 export class DishService {
   /**
@@ -86,6 +87,29 @@ export class DishService {
     if (data.price !== undefined) {
       updates.push('price = ?');
       params.push(data.price);
+    }
+
+    // 处理 category 字段（字符串），需要查找对应的 category_id
+    if (data.category !== undefined) {
+      // 根据分类名称查找分类ID
+      const categoryService = new CategoryService();
+      const categories = categoryService.getAll();
+      const category = categories.find((c: DishCategory) => c.name === data.category);
+
+      if (category) {
+        updates.push('category_id = ?');
+        params.push(category.id);
+      } else {
+        // 如果找不到分类，设置为 null
+        updates.push('category_id = ?');
+        params.push(null);
+      }
+    }
+
+    // 直接处理 category_id
+    if (data.category_id !== undefined) {
+      updates.push('category_id = ?');
+      params.push(data.category_id);
     }
 
     if (updates.length === 0) {

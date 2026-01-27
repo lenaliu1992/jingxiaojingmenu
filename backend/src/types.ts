@@ -79,6 +79,7 @@ export interface UpdateDishRequest {
   name?: string;
   cost?: number;
   price?: number;
+  category?: string;
   category_id?: string;
 }
 

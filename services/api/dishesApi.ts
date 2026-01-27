@@ -11,6 +11,7 @@ export interface UpdateDishRequest {
   name?: string;
   cost?: number;
   price?: number;
+  category?: string; // 分类名称
 }
 
 // 转换 snake_case 到 camelCase

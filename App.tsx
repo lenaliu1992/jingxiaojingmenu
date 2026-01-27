@@ -1,19 +1,19 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { DishLibrary } from './components/DishLibrary';
+import { DishLibraryNew } from './components/DishLibraryNew';
 import { MealCreator } from './components/MealCreator';
-import { MealCard } from './components/MealCard';
+import { MealListCompact } from './components/MealListCompact';
+import { TabNavigation } from './components/TabNavigation';
 import { ImportResultDialog } from './components/ImportResultDialog';
 import { DataPersistenceControls } from './components/DataPersistenceControls';
 import { LoadResultDialog } from './components/LoadResultDialog';
 import { DishImportResultDialog } from './components/DishImportResultDialog';
 import { DishImportStrategyDialog } from './components/DishImportStrategyDialog';
 import { ExportSelectionDialog } from './components/ExportSelectionDialog';
-import { TestNewUI } from './TestNewUI';
 import { Dish, MealPlan, MealPlanAnalysis, ImportResult, LoadResult } from './types';
 import { exportToExcel, importFromExcel, importDishesFromExcel } from './services/excelService';
 import { exportToJson, importFromJson as importDataFromJson, mergeData } from './services/dataPersistenceService';
 import { dishesApi, mealsApi } from './services/api';
-import { Plus, Download, Upload, ChefHat, LayoutGrid, List, RefreshCw, Sparkles } from 'lucide-react';
+import { Plus, Download, Upload, ChefHat, RefreshCw } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -105,9 +105,6 @@ const INITIAL_MEALS: MealPlan[] = migrateMealData([
 ]);
 
 export default function App() {
-  // 界面版本控制
-  const [uiVersion, setUiVersion] = useState<'old' | 'new'>('old');
-
   // API 配置
   const useApi = import.meta.env.VITE_USE_API === 'true';
   const [loading, setLoading] = useState(false);
@@ -116,9 +113,9 @@ export default function App() {
   // 数据状态
   const [dishes, setDishes] = useState<Dish[]>(INITIAL_DISHES);
   const [meals, setMeals] = useState<MealPlan[]>(INITIAL_MEALS);
+  const [activeTab, setActiveTab] = useState<'dishes' | 'meals'>('dishes');
   const [isCreatorOpen, setIsCreatorOpen] = useState(false);
   const [editingMeal, setEditingMeal] = useState<MealPlan | null>(null);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [importDialog, setImportDialog] = useState<{
     show: boolean;
     result: ImportResult | null;
@@ -227,21 +224,29 @@ export default function App() {
         return ((price - cost) / price) * 100;
       };
 
+      // 确保 promoPrice2 为 0 时转换为 undefined
+      const normalizedPromoPrice2 = (meal.promoPrice2 || 0) > 0 ? meal.promoPrice2 : undefined;
+
+      // 如果 standardPrice 为 0，使用 totalOriginalPrice 作为原价
+      const effectiveStandardPrice = meal.standardPrice > 0 ? meal.standardPrice : totalOriginalPrice;
+
       return {
         ...meal,
         totalCost,
         totalOriginalPrice,
-        standardProfit: meal.standardPrice - totalCost,
-        standardMargin: calcMargin(meal.standardPrice, totalCost),
+        standardProfit: effectiveStandardPrice - totalCost,
+        standardMargin: calcMargin(effectiveStandardPrice, totalCost),
         promoProfit1: meal.promoPrice1 - totalCost,
         promoMargin1: calcMargin(meal.promoPrice1, totalCost),
         // 只有当 promoPrice2 存在时才计算相关指标
-        promoProfit2: meal.promoPrice2 !== undefined
-          ? meal.promoPrice2 - totalCost
+        promoProfit2: normalizedPromoPrice2 !== undefined
+          ? normalizedPromoPrice2 - totalCost
           : undefined,
-        promoMargin2: meal.promoPrice2 !== undefined
-          ? calcMargin(meal.promoPrice2, totalCost)
+        promoMargin2: normalizedPromoPrice2 !== undefined
+          ? calcMargin(normalizedPromoPrice2, totalCost)
           : undefined,
+        // 覆盖原始的 promoPrice2，确保 0 被转换为 undefined
+        promoPrice2: normalizedPromoPrice2,
       };
     });
   }, [meals, dishes]);
@@ -287,37 +292,6 @@ export default function App() {
         setHasUnsavedChanges(true);
       }
     }
-  };
-
-  // 创建可排序的套餐卡片组件
-  const SortableMealCard = ({ meal, index }: { meal: MealPlanAnalysis; index: number }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-    } = useSortable({ id: meal.id });
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-    };
-
-    return (
-      <div ref={setNodeRef} style={style}>
-        <MealCard
-          meal={meal}
-          dishes={dishes}
-          onDelete={handleDeleteMeal}
-          onEdit={openCreatorForEdit}
-          dragHandleProps={{
-            ...attributes,
-            ...listeners,
-          }}
-        />
-      </div>
-    );
   };
 
   const handleAddDish = async (name: string, cost: number, price?: number) => {
@@ -394,10 +368,10 @@ export default function App() {
     }
   };
 
-  const handleUpdateDish = async (id: string, name: string, cost: number, price?: number) => {
+  const handleUpdateDish = async (id: string, name: string, cost: number, price?: number, category?: DishCategory) => {
     if (useApi) {
       try {
-        const updatedDish = await dishesApi.update(id, { name, cost, price });
+        const updatedDish = await dishesApi.update(id, { name, cost, price, category });
         // API 返回的数据格式已经是正确的（Dish 类型），直接使用
         setDishes(dishes.map(d =>
           d.id === id ? updatedDish : d
@@ -408,10 +382,42 @@ export default function App() {
     } else {
       setDishes(dishes.map(d =>
         d.id === id
-          ? { ...d, name, cost, price }
+          ? { ...d, name, cost, price, category: category || d.category }
           : d
       ));
     }
+  };
+
+  const handleReorder = async (newMeals: MealPlanAnalysis[]) => {
+    // 只保留 id, name, dishIds, standardPrice, promoPrice1, promoPrice2
+    const reorderedMeals: MealPlan[] = newMeals.map(m => ({
+      id: m.id,
+      name: m.name,
+      dishIds: m.dishIds,
+      standardPrice: m.standardPrice,
+      promoPrice1: m.promoPrice1,
+      promoPrice2: m.promoPrice2,
+    }));
+    setMeals(reorderedMeals);
+
+    // 同步到后端
+    if (useApi) {
+      try {
+        const mealOrders = reorderedMeals.map((m, index) => ({
+          id: m.id,
+          sort_order: index,
+        }));
+        await mealsApi.reorder(mealOrders);
+      } catch (err: any) {
+        alert(`排序失败: ${err.message}`);
+      }
+    } else {
+      setHasUnsavedChanges(true);
+    }
+  };
+
+  const handleTabChange = (tab: 'dishes' | 'meals') => {
+    setActiveTab(tab);
   };
 
   const handleSaveMeal = async (mealData: Omit<MealPlan, 'id'>) => {
@@ -763,60 +769,76 @@ export default function App() {
     exportToExcel(template, '套餐导入模板');
   };
 
-  // 新界面版本
-  if (uiVersion === 'new') {
-    return (
-      <>
-        {/* 界面版本切换按钮 */}
-        <button
-          onClick={() => setUiVersion('old')}
-          className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 group"
-          title="切换回旧版本"
-        >
-          <Sparkles className="w-4 h-4 text-purple-500 group-hover:rotate-12 transition-transform" />
-          <span className="text-sm font-medium text-gray-700">返回旧版</span>
-        </button>
-
-        <TestNewUI />
-      </>
-    );
-  }
-
-  // 旧界面版本
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800 font-sans">
-      {/* 界面版本切换按钮 */}
-      <button
-        onClick={() => setUiVersion('new')}
-        className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg shadow-lg hover:shadow-xl transition-all hover:scale-105 group"
-        title="体验全新界面"
-      >
-        <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-        <span className="text-sm font-medium">体验新版</span>
-      </button>
-      
-      {/* Sidebar: Dish Library */}
-      <aside className="w-80 flex-shrink-0 border-r border-slate-200 bg-white z-10 hidden md:block">
-        <div className="h-full p-4 flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-slate-700">菜品库</h2>
+    <div className="app-container">
+      {/* Header */}
+      <header className="app-header">
+        <div className="header-left">
+          <div className="logo">
+            <ChefHat className="logo-icon" size={32} />
+          </div>
+          <div className="header-title">
+            <h1>MarginMaster</h1>
+            <p>餐饮团购毛利测算系统</p>
+          </div>
+        </div>
+
+        <div className="header-right">
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-emerald-600 hover:border-emerald-600 transition-all active:scale-95"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">导出 Excel</span>
+          </button>
+          <button
+            onClick={() => document.getElementById('excel-upload-input')?.click()}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-blue-600 hover:border-blue-600 transition-all active:scale-95"
+          >
+            <Upload className="w-4 h-4" />
+            <span className="hidden sm:inline">导入 Excel</span>
+          </button>
+          <input
+            id="excel-upload-input"
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleImport}
+          />
+
+          {/* Data Persistence Controls */}
+          <DataPersistenceControls
+            hasUnsavedChanges={hasUnsavedChanges}
+            onSave={handleSaveData}
+            onLoad={handleLoadData}
+          />
+
+          {activeTab === 'meals' && (
             <button
-              onClick={() => {
-                if (!isImportingDishes) {
-                  document.getElementById('dish-import-input')?.click();
-                }
-              }}
-              disabled={isImportingDishes}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-                isImportingDishes
-                  ? 'text-slate-400 bg-slate-100 cursor-not-allowed'
-                  : 'text-blue-600 bg-blue-50 hover:bg-blue-100'
-              }`}
-              title={isImportingDishes ? '正在导入...' : '从 Excel 导入菜品'}
+              onClick={() => setIsCreatorOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isImportingDishes ? 'animate-spin' : ''}`} />
-              <span>{isImportingDishes ? '导入中...' : '导入'}</span>
+              <Plus className="w-4 h-4" />
+              <span>新建套餐</span>
             </button>
+          )}
+        </div>
+      </header>
+
+      {/* Tab 导航 */}
+      <TabNavigation
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        dishCount={dishes.length}
+        mealCount={analyzedMeals.length}
+      />
+
+      {/* 主内容区 */}
+      <main className="main-content">
+        {/* Tab 内容区域 */}
+        {activeTab === 'dishes' ? (
+          <div className="tab-content dishes-tab">
+            {/* 菜品导入输入框（隐藏） */}
             <input
               id="dish-import-input"
               type="file"
@@ -824,125 +846,27 @@ export default function App() {
               className="hidden"
               onChange={handleImportDishes}
             />
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            <DishLibrary
+            <DishLibraryNew
               dishes={dishes}
               onAddDish={handleAddDish}
               onDeleteDish={handleDeleteDish}
               onUpdateDish={handleUpdateDish}
             />
           </div>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col h-full relative overflow-hidden">
-        
-        {/* Header */}
-        <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm z-20">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white shadow-lg shadow-slate-900/20">
-              <ChefHat className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">MarginMaster</h1>
-              <p className="text-xs text-slate-500 font-medium">餐饮团购毛利测算系统</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-             {/* View Toggles (Visual only for now) */}
-             <div className="hidden sm:flex bg-slate-100 p-1 rounded-lg border border-slate-200 mr-2">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-slate-800' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                  <List className="w-4 h-4" />
-                </button>
-             </div>
-
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-accent hover:border-accent transition-all active:scale-95"
-            >
-              <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">导出 Excel</span>
-            </button>
-            <button
-              onClick={() => document.getElementById('excel-upload-input')?.click()}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-blue-600 hover:border-blue-600 transition-all active:scale-95"
-            >
-              <Upload className="w-4 h-4" />
-              <span className="hidden sm:inline">导入 Excel</span>
-            </button>
-            <input
-              id="excel-upload-input"
-              type="file"
-              accept=".xlsx,.xls"
-              className="hidden"
-              onChange={handleImport}
+        ) : (
+          <div className="tab-content meals-tab">
+            <MealListCompact
+              meals={analyzedMeals}
+              dishes={dishes}
+              onSelectMeal={(meal) => {
+                setEditingMeal(meal);
+                setIsCreatorOpen(true);
+              }}
+              onDeleteMeal={handleDeleteMeal}
+              onReorder={handleReorder}
             />
-
-            {/* Data Persistence Controls */}
-            <DataPersistenceControls
-              hasUnsavedChanges={hasUnsavedChanges}
-              onSave={handleSaveData}
-              onLoad={handleLoadData}
-            />
-            <button 
-              onClick={() => setIsCreatorOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-accent hover:bg-emerald-600 rounded-lg shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              <span>新建套餐</span>
-            </button>
           </div>
-        </header>
-
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar relative">
-          
-          {/* Empty State */}
-          {meals.length === 0 && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 pointer-events-none">
-              <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                <ChefHat className="w-10 h-10 opacity-20" />
-              </div>
-              <p className="text-lg font-medium">还没有创建任何套餐</p>
-              <p className="text-sm">点击右上角 "新建套餐" 开始测算</p>
-            </div>
-          )}
-
-          {/* Grid Layout */}
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={analyzedMeals.map(meal => meal.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className={`grid gap-6 ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1'}`}>
-                {analyzedMeals.map((meal, index) => (
-                  <SortableMealCard
-                    key={meal.id}
-                    meal={meal}
-                    index={index}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </div>
-
+        )}
       </main>
 
       {/* Modal */}

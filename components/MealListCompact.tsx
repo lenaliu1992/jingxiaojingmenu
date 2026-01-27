@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { GripVertical, Edit, Trash2, ChevronDown, ChevronRight, Plus } from 'lucide-react';
-import { MealPlanAnalysis } from '../types';
+import { MealPlanAnalysis, Dish } from '../types';
 import {
   DndContext,
   closestCenter,
@@ -21,6 +21,7 @@ import { CSS } from '@dnd-kit/utilities';
 
 interface MealListCompactProps {
   meals: MealPlanAnalysis[];
+  dishes: Dish[];
   onSelectMeal: (meal: MealPlanAnalysis) => void;
   onDeleteMeal: (id: string) => void;
   onReorder?: (meals: MealPlanAnalysis[]) => void;
@@ -29,6 +30,7 @@ interface MealListCompactProps {
 // 可排序的套餐项组件
 interface SortableMealItemProps {
   meal: MealPlanAnalysis;
+  dishes: Dish[];
   isExpanded: boolean;
   onToggleExpand: (id: string) => void;
   onSelectMeal: (meal: MealPlanAnalysis) => void;
@@ -38,6 +40,7 @@ interface SortableMealItemProps {
 
 function SortableMealItem({
   meal,
+  dishes,
   isExpanded,
   onToggleExpand,
   onSelectMeal,
@@ -86,7 +89,9 @@ function SortableMealItem({
         <div className="meal-pricing">
           <div className="price-group">
             <span className="price-label">原价</span>
-            <span className="price-value">¥{meal.standardPrice}</span>
+            <span className="price-value">
+              ¥{meal.standardPrice > 0 ? meal.standardPrice : meal.totalOriginalPrice.toFixed(0)}
+            </span>
           </div>
           <div className="price-group">
             <span className="price-label">秒杀</span>
@@ -102,7 +107,8 @@ function SortableMealItem({
 
         <div className="meal-margin">
           <div className={`margin-badge margin-${marginClass}`}>
-            {meal.standardMargin.toFixed(1)}%
+            <span className="margin-label">毛利率</span>
+            <span className="margin-value">{meal.standardMargin.toFixed(1)}%</span>
           </div>
           <div className="margin-detail">
             <span className="profit-value">¥{meal.standardProfit.toFixed(0)}</span>
@@ -157,11 +163,14 @@ function SortableMealItem({
             <div className="detail-item detail-full">
               <span className="detail-label">包含菜品</span>
               <div className="dish-tags">
-                {meal.dishIds.map((dishId, index) => (
-                  <span key={dishId} className="dish-tag">
-                    菜品 {index + 1}
-                  </span>
-                ))}
+                {meal.dishIds.map((dishId) => {
+                  const dish = dishes.find(d => d.id === dishId);
+                  return (
+                    <span key={dishId} className="dish-tag">
+                      {dish ? dish.name : `未知菜品 (${dishId})`}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -173,6 +182,7 @@ function SortableMealItem({
 
 export const MealListCompact: React.FC<MealListCompactProps> = ({
   meals,
+  dishes,
   onSelectMeal,
   onDeleteMeal,
   onReorder,
@@ -234,10 +244,6 @@ export const MealListCompact: React.FC<MealListCompactProps> = ({
             <h2>套餐列表</h2>
             <span className="meal-count">{meals.length} 个套餐</span>
           </div>
-          <button className="btn btn-primary">
-            <Plus size={18} />
-            新建套餐
-          </button>
         </div>
 
         <div className="meal-list-content">
@@ -253,6 +259,7 @@ export const MealListCompact: React.FC<MealListCompactProps> = ({
                   <SortableMealItem
                     key={meal.id}
                     meal={meal}
+                    dishes={dishes}
                     isExpanded={expandedMealId === meal.id}
                     onToggleExpand={setExpandedMealId}
                     onSelectMeal={onSelectMeal}

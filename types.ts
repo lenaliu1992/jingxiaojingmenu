@@ -4,6 +4,7 @@ export interface Dish {
   cost: number;
   price?: number; // Original a la carte price (reference selling price)
   categoryId?: string; // 菜品分类ID
+  categoryName?: string; // 菜品分类名称（用于显示和筛选）
   category?: DishCategoryData; // 菜品分类对象（可选，关联数据）
 }
 

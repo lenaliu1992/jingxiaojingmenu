@@ -299,7 +299,7 @@ const DeleteCategoryDialog: React.FC<DeleteCategoryDialogProps> = ({
               取消
             </button>
             <button
-              onClick={onConfirm}
+              onClick={() => onConfirm(categoryId)}
               disabled={!replaceWith}
               className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 disabled:bg-slate-300 disabled:cursor-not-allowed rounded-lg transition-colors"
             >

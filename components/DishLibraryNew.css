@@ -408,3 +408,84 @@
     width: 100%;
   }
 }
+
+/* 批量操作工具栏 */
+.batch-toolbar {
+  padding: 1rem 1.25rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  margin-bottom: 1rem;
+}
+
+.batch-toolbar-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.batch-info {
+  color: white;
+  font-size: 0.875rem;
+}
+
+.batch-info strong {
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.batch-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.batch-category-select {
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  cursor: pointer;
+  min-width: 150px;
+  background: white;
+}
+
+.batch-toolbar .btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  border: none;
+}
+
+.batch-toolbar .btn-primary {
+  background: white;
+  color: #667eea;
+  font-weight: 600;
+}
+
+.batch-toolbar .btn-primary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.batch-toolbar .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.batch-toolbar .btn-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-weight: 600;
+}
+
+.batch-toolbar .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* 选中行样式 */
+.table tbody tr.selected {
+  background: rgba(102, 126, 234, 0.08);
+}
+
+.table tbody tr.selected:hover {
+  background: rgba(102, 126, 234, 0.12);
+}

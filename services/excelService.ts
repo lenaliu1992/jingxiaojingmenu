@@ -107,7 +107,42 @@ export const exportToExcel = (meals: MealPlanAnalysis[], dishes: Dish[]) => {
   // 3. 判断是否需要包含秒杀价2列
   const hasAnyPromoPrice2 = meals.some(m => m.promoPrice2 !== undefined);
 
-  // 4. 计算并应用合并单元格
+  // 4. 设置数字格式 - 遍历所有单元格并设置格式
+  const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+
+  for (let row = range.s.r; row <= range.e.r; row++) {
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
+      const cell = worksheet[cellAddress];
+
+      if (!cell) continue;
+
+      // 获取列索引对应的字段名
+      const headerRow = 0; // 表头在第0行
+      const headerCellAddress = XLSX.utils.encode_cell({ r: headerRow, c: col });
+      const headerCell = worksheet[headerCellAddress];
+
+      if (!headerCell) continue;
+
+      const fieldName = headerCell.v;
+
+      // 设置价格列的格式（数字格式，保留2位小数）
+      if (['菜品单价', '菜品成本', '菜品小计', '套餐原价', '秒杀价1', '秒杀价2'].includes(fieldName)) {
+        // 如果是数据行（不是表头）
+        if (row > 0 && typeof cell.v === 'string') {
+          // 移除 ¥ 符号并转换为数字
+          const numericValue = parseFloat(cell.v.replace(/[¥\s]/g, ''));
+          if (!isNaN(numericValue)) {
+            cell.v = numericValue;
+            cell.t = 'n'; // 设置为数字类型
+            cell.z = '"¥"#,##0.00'; // 设置为货币格式
+          }
+        }
+      }
+    }
+  }
+
+  // 5. 计算并应用合并单元格
   const merges: XLSX.Range[] = [];
   let currentRowIndex = 1; // 从第1行开始（第0行是表头）
 
@@ -149,7 +184,7 @@ export const exportToExcel = (meals: MealPlanAnalysis[], dishes: Dish[]) => {
   // 应用合并配置到工作表
   worksheet['!merges'] = merges;
 
-  // 5. 设置列宽（动态调整）
+  // 6. 设置列宽（动态调整）
   const wscols = hasAnyPromoPrice2
     ? [
         { wch: 8 },   // 序号（新增，第一列）
@@ -179,16 +214,16 @@ export const exportToExcel = (meals: MealPlanAnalysis[], dishes: Dish[]) => {
       ];
   worksheet['!cols'] = wscols;
 
-  // 5. 创建工作簿
+  // 7. 创建工作簿
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "套餐菜品明细");
 
-  // 6. 生成文件名（使用日期+时间戳）
+  // 8. 生成文件名（使用日期+时间戳）
   const now = new Date();
   const date = now.toISOString().split('T')[0];
   const time = now.toTimeString().split(' ')[0].replace(/:/g, '-');
 
-  // 7. 导出文件
+  // 9. 导出文件
   const fileName = `菜品毛利分析_${date}_${time}.xlsx`;
   console.log('正在导出文件:', fileName);
   XLSX.writeFile(workbook, fileName);

@@ -29,6 +29,10 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
     category: '其他',
   });
 
+  // 批量操作状态
+  const [selectedDishIds, setSelectedDishIds] = useState<Set<string>>(new Set());
+  const [batchCategory, setBatchCategory] = useState<string>('');
+
   // 加载分类数据
   useEffect(() => {
     const loadCategories = async () => {
@@ -64,12 +68,12 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
   });
 
   // 过滤和分组菜品
-  const { filteredDishes, categoriesWithCount } = useMemo(() => {
+  const { filteredDishes } = useMemo(() => {
     let filtered = dishes;
 
     // 按分类筛选
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter(d => d.category === selectedCategory);
+      filtered = filtered.filter(d => d.categoryName === selectedCategory);
     }
 
     // 按搜索词筛选
@@ -79,15 +83,8 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
       );
     }
 
-    // 计算每个分类的数量
-    const categoryCount = (Object.keys(DISH_CATEGORIES) as DishCategory[]).reduce((acc, cat) => {
-      acc[cat] = dishes.filter(d => d.category === cat).length;
-      return acc;
-    }, {} as Record<DishCategory, number>);
-
     return {
       filteredDishes: filtered,
-      categoriesWithCount: categoryCount,
     };
   }, [dishes, selectedCategory, searchTerm]);
 
@@ -95,6 +92,21 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
   const calculateMargin = (cost: number, price?: number) => {
     if (!price) return null;
     return ((price - cost) / price) * 100;
+  };
+
+  // 批量更新分类
+  const handleBatchUpdateCategory = () => {
+    if (!batchCategory) return;
+
+    selectedDishIds.forEach(id => {
+      const dish = dishes.find(d => d.id === id);
+      if (dish) {
+        onUpdateDish(id, dish.name, dish.cost, dish.price, batchCategory as DishCategory);
+      }
+    });
+
+    setSelectedDishIds(new Set());
+    setBatchCategory('');
   };
 
   // 获取毛利率样式
@@ -111,7 +123,7 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
       name: dish.name,
       cost: dish.cost.toString(),
       price: dish.price?.toString() || '',
-      category: dish.category || '其他',
+      category: dish.categoryName || '其他',
     });
   };
 
@@ -236,9 +248,9 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
                 onChange={(e) => setNewDish({ ...newDish, category: e.target.value as DishCategory })}
                 className="input input-category"
               >
-                {(Object.keys(DISH_CATEGORIES) as DishCategory[]).map((cat) => (
-                  <option key={cat} value={cat}>
-                    {DISH_CATEGORIES[cat].icon} {cat}
+                {categories.map((category) => (
+                  <option key={category.id} value={category.name}>
+                    {category.icon} {category.name}
                   </option>
                 ))}
               </select>
@@ -273,9 +285,61 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
 
           {/* 菜品表格 */}
           <div className="dish-table-container card animate-slideIn">
+            {/* 批量操作工具栏 */}
+            {selectedDishIds.size > 0 && (
+              <div className="batch-toolbar card animate-fadeIn">
+                <div className="batch-toolbar-content">
+                  <span className="batch-info">
+                    已选择 <strong>{selectedDishIds.size}</strong> 道菜品
+                  </span>
+                  <div className="batch-actions">
+                    <select
+                      value={batchCategory}
+                      onChange={(e) => setBatchCategory(e.target.value)}
+                      className="batch-category-select"
+                    >
+                      <option value="">选择新分类...</option>
+                      {categories.map((cat) => (
+                        <option key={cat.id} value={cat.name}>
+                          {cat.icon} {cat.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleBatchUpdateCategory}
+                      disabled={!batchCategory}
+                      className="btn btn-primary"
+                    >
+                      批量修改分类
+                    </button>
+                    <button
+                      onClick={() => setSelectedDishIds(new Set())}
+                      className="btn btn-secondary"
+                    >
+                      取消选择
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <table className="table">
               <thead>
                 <tr>
+                  <th style={{ width: '40px' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedDishIds.size === filteredDishes.length && filteredDishes.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedDishIds(new Set(filteredDishes.map(d => d.id)));
+                        } else {
+                          setSelectedDishIds(new Set());
+                        }
+                      }}
+                      className="w-4 h-4 rounded border-gray-300"
+                    />
+                  </th>
                   <th>菜品名称</th>
                   <th>分类</th>
                   <th>成本</th>
@@ -287,7 +351,7 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
               <tbody>
                 {filteredDishes.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="empty-state">
+                    <td colSpan={7} className="empty-state">
                       <div className="empty-content">
                         <p>暂无菜品数据</p>
                         <span className="empty-hint">请添加菜品或切换分类</span>
@@ -298,11 +362,29 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
                   filteredDishes.map((dish) => {
                     const isEditing = editingDishId === dish.id;
                     const margin = calculateMargin(dish.cost, dish.price);
+                    const category = categories.find(c => c.name === (dish.categoryName || '其他'));
 
                     return (
-                      <tr key={dish.id} className={isEditing ? 'editing' : ''}>
+                      <tr key={dish.id} className={`${isEditing ? 'editing' : ''} ${selectedDishIds.has(dish.id) ? 'selected' : ''}`}>
                         {isEditing ? (
                           <>
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={selectedDishIds.has(dish.id)}
+                                onChange={() => {
+                                  const newSelected = new Set(selectedDishIds);
+                                  if (newSelected.has(dish.id)) {
+                                    newSelected.delete(dish.id);
+                                  } else {
+                                    newSelected.add(dish.id);
+                                  }
+                                  setSelectedDishIds(newSelected);
+                                }}
+                                className="w-4 h-4 rounded border-gray-300"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </td>
                             <td>
                               <input
                                 type="text"
@@ -318,9 +400,9 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
                                 onChange={(e) => setEditForm({ ...editForm, category: e.target.value as DishCategory })}
                                 className="input input-inline"
                               >
-                                {(Object.keys(DISH_CATEGORIES) as DishCategory[]).map((cat) => (
-                                  <option key={cat} value={cat}>
-                                    {DISH_CATEGORIES[cat].icon} {cat}
+                                {categories.map((category) => (
+                                  <option key={category.id} value={category.name}>
+                                    {category.icon} {category.name}
                                   </option>
                                 ))}
                               </select>
@@ -368,12 +450,29 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
                           </>
                         ) : (
                           <>
+                            <td>
+                              <input
+                                type="checkbox"
+                                checked={selectedDishIds.has(dish.id)}
+                                onChange={() => {
+                                  const newSelected = new Set(selectedDishIds);
+                                  if (newSelected.has(dish.id)) {
+                                    newSelected.delete(dish.id);
+                                  } else {
+                                    newSelected.add(dish.id);
+                                  }
+                                  setSelectedDishIds(newSelected);
+                                }}
+                                className="w-4 h-4 rounded border-gray-300"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </td>
                             <td className="dish-name">
                               {dish.name}
                             </td>
                             <td>
-                              <span className="category-badge" style={{ backgroundColor: DISH_CATEGORIES[dish.category || '其他'].color + '20', color: DISH_CATEGORIES[dish.category || '其他'].color }}>
-                                {DISH_CATEGORIES[dish.category || '其他'].icon} {dish.category || '其他'}
+                              <span className="category-badge" style={{ backgroundColor: (category?.color || '#6b7280') + '20', color: category?.color || '#6b7280' }}>
+                                {category?.icon || '🍽️'} {category?.name || '其他'}
                               </span>
                             </td>
                             <td className="cost">

@@ -10,6 +10,99 @@
 
 ---
 
+## 🤖 自动质量保证流程
+
+> 每次开发时,Claude会自动执行以下检查,减少bug率、提高开发效率
+
+### 开发前检查 (自动执行)
+
+每次开始新功能开发前,我会:
+- [x] 需求理解: 用一句话描述功能目标
+- [x] 数据实体: 明确涉及哪些数据结构/表/字段
+- [x] API/函数设计: 确定需要哪些接口/函数
+- [x] Bug预判: 预判可能出现什么问题
+
+### 开发中检查 (实时)
+
+编写代码时,我会确保:
+- [x] TypeScript类型安全: 所有参数和返回值都有类型
+- [x] 可选字段处理: 明确 `undefined` vs `null` vs `0` 的区别
+- [x] 输入验证: 验证所有用户输入
+- [x] 错误处理: try-catch + 友好错误提示
+- [x] 不可变更新: 使用展开运算符而非直接修改
+
+### 开发后检查 (自动触发)
+
+完成代码编辑后,我会自动:
+1. 检查修改了哪些文件
+2. 根据项目类型运行相应检查清单
+3. 发现问题时自动报告并给出修复建议
+4. 无问题时静默完成
+
+### 本项目关键文件位置
+
+- **类型定义**: `types.ts`
+- **API层**: `services/api/dishesApi.ts`, `services/api/mealsApi.ts`, `services/api/categoriesApi.ts`
+- **前端组件**: `components/App.tsx`, `components/DishLibraryNew.tsx`, `components/MealListCompact.tsx`
+- **后端路由**: `backend/src/routes/dishes.ts`, `backend/src/routes/meals.ts`, `backend/src/routes/categories.ts`
+
+### 本项目常见Bug模式预防
+
+1. **可选字段显示**
+   ```typescript
+   // ❌ 错误
+   {dish.price}
+
+   // ✅ 正确
+   {dish.price !== undefined ? `¥${dish.price}` : '-'}
+   // 或
+   {dish.price || '-'}
+   ```
+
+2. **数据同步**
+   ```typescript
+   // API成功后立即更新state
+   const handleCreateDish = async (dish: Omit<Dish, 'id'>) => {
+     const newDish = await dishesApi.create(dish);
+     setDishes([...dishes, newDish]); // 立即更新
+   };
+   ```
+
+3. **类型转换 (前后端字段名)**
+   ```typescript
+   // 前端: camelCase
+   interface Dish {
+     categoryId?: string;
+   }
+
+   // 后端: snake_case
+   interface DishRequest {
+     category_id?: string;
+   }
+
+   // 转换函数
+   const toSnakeCase = (obj: any): any => {
+     // 转换逻辑...
+   };
+   ```
+
+4. **边界条件**
+   ```typescript
+   // ❌ 可能崩溃
+   dishes.filter(d => d.categoryName === selectedCategory)
+
+   // ✅ 安全
+   dishes.filter(d => d.categoryName === selectedCategory && d.name)
+
+   // ❌ NaN
+   const margin = (price - cost) / price * 100;
+
+   // ✅ 安全
+   const margin = price > 0 ? ((price - cost) / price * 100) : 0;
+   ```
+
+---
+
 ## 👤 用户信息
 
 - **姓名**: Lena
