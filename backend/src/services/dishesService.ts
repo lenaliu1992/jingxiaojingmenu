@@ -66,10 +66,16 @@ export class DishService {
     const id = Date.now().toString();
     const now = getCurrentTimestamp();
 
+    // 如果提供了category_id，先验证分类是否存在
+    let categoryId = null;
+    if (data.category_id) {
+      categoryId = data.category_id;
+    }
+
     executeUpdate(
-      `INSERT INTO dishes (id, name, cost, price, created_at, updated_at, source)
-       VALUES (?, ?, ?, ?, ?, ?, 'user')`,
-      [id, data.name, data.cost, data.price || null, now, now]
+      `INSERT INTO dishes (id, name, cost, price, category_id, created_at, updated_at, source)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'user')`,
+      [id, data.name, data.cost, data.price || null, categoryId, now, now]
     );
 
     saveDatabase();
@@ -140,7 +146,41 @@ export class DishService {
 
     saveDatabase();
 
+    // 价格自动同步逻辑：如果修改了cost或price，更新所有关联的单品套餐
+    if (data.cost !== undefined || data.price !== undefined) {
+      this.syncSingleDishMealPrices(id, data.cost !== undefined ? data.cost : dish.cost, data.price !== undefined ? data.price : dish.price);
+    }
+
     return this.getById(id);
+  }
+
+  /**
+   * 同步单品套餐的价格
+   */
+  private syncSingleDishMealPrices(dishId: string, newCost: number, newPrice?: number): void {
+    // 查找所有关联该菜品的单品套餐
+    const singleDishMeals = executeQuery<any>(
+      'SELECT * FROM meal_plans WHERE is_single_dish = 1 AND sync_dish_id = ? AND deleted_at IS NULL',
+      [dishId]
+    );
+
+    if (singleDishMeals.length === 0) {
+      return;
+    }
+
+    // 计算新的套餐价格
+    const standardPrice = newPrice || newCost * 1.5;
+    const promoPrice1 = newCost * 1.2;
+
+    // 更新所有单品套餐的价格
+    singleDishMeals.forEach((meal) => {
+      executeUpdate(
+        'UPDATE meal_plans SET standard_price = ?, promo_price1 = ?, updated_at = ? WHERE id = ?',
+        [standardPrice, promoPrice1, getCurrentTimestamp(), meal.id]
+      );
+    });
+
+    saveDatabase();
   }
 
   /**

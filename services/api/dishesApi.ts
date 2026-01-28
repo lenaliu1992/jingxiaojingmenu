@@ -1,11 +1,12 @@
 import { apiClient } from './client';
-import { Dish, DuplicateCheckResult, BatchImportResult } from '../../types';
+import { Dish, MealPlan, DuplicateCheckResult, BatchImportResult } from '../../types';
 import { toCamelCase } from './utils';
 
 export interface CreateDishRequest {
   name: string;
   cost: number;
   price?: number;
+  category?: string; // 分类名称
 }
 
 export interface UpdateDishRequest {
@@ -81,6 +82,14 @@ export const dishesApi = {
     }
   ): Promise<BatchImportResult> => {
     const response = await apiClient.post('/dishes/batch/import', request);
+    return toCamelCase(response.data);
+  },
+
+  /**
+   * 为菜品创建单品套餐
+   */
+  createSingleDishMeal: async (dishId: string, name?: string): Promise<MealPlan> => {
+    const response = await apiClient.post(`/dishes/${dishId}/create-single-dish-meal`, { name });
     return toCamelCase(response.data);
   },
 };

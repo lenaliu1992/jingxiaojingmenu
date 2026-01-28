@@ -52,9 +52,12 @@ export interface MealPlan {
   name: string;
   dishIds: string[]; // References Dish.id
   standardPrice: number;
-  promoPrice1: number;
-  promoPrice2?: number; // 可选，undefined 表示未设置
+  promoPrice1: number; // 秒杀价1
+  promoPrice2?: number; // 官方补贴金额（可选）
   order?: number; // 排序顺序（可选）
+  // 单品套餐相关字段
+  isSingleDish?: boolean; // 是否为单品套餐
+  syncDishId?: string; // 关联的菜品ID（仅单品套餐）
 }
 
 export interface MealPlanAnalysis extends MealPlan {
@@ -62,10 +65,13 @@ export interface MealPlanAnalysis extends MealPlan {
   totalOriginalPrice: number; // Sum of dish.price
   standardMargin: number; // percentage
   promoMargin1: number; // percentage
-  promoMargin2?: number; // percentage，可选
+  promoMargin2?: number; // 官方补贴后的毛利率，可选
   standardProfit: number;
   promoProfit1: number;
   promoProfit2?: number; // 可选
+  // 新增：最终到手价（计算字段）
+  finalPrice?: number; // = promoPrice1 - promoPrice2
+  finalMargin?: number; // 最终到手价的毛利率
 }
 
 export interface CalculatedDish extends Dish {

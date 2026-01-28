@@ -230,6 +230,11 @@ export default function App() {
       // 如果 standardPrice 为 0，使用 totalOriginalPrice 作为原价
       const effectiveStandardPrice = meal.standardPrice > 0 ? meal.standardPrice : totalOriginalPrice;
 
+      // 新增：计算最终到手价
+      const finalPrice = meal.promoPrice2 !== undefined
+        ? meal.promoPrice1 - meal.promoPrice2
+        : undefined;
+
       return {
         ...meal,
         totalCost,
@@ -238,15 +243,20 @@ export default function App() {
         standardMargin: calcMargin(effectiveStandardPrice, totalCost),
         promoProfit1: meal.promoPrice1 - totalCost,
         promoMargin1: calcMargin(meal.promoPrice1, totalCost),
-        // 只有当 promoPrice2 存在时才计算相关指标
-        promoProfit2: normalizedPromoPrice2 !== undefined
-          ? normalizedPromoPrice2 - totalCost
+        // 计算官方补贴后的利润和毛利率
+        promoProfit2: finalPrice !== undefined
+          ? finalPrice - totalCost
           : undefined,
-        promoMargin2: normalizedPromoPrice2 !== undefined
-          ? calcMargin(normalizedPromoPrice2, totalCost)
+        promoMargin2: finalPrice !== undefined
+          ? calcMargin(finalPrice, totalCost)
           : undefined,
         // 覆盖原始的 promoPrice2，确保 0 被转换为 undefined
         promoPrice2: normalizedPromoPrice2,
+        // 新增字段
+        finalPrice,
+        finalMargin: finalPrice !== undefined
+          ? calcMargin(finalPrice, totalCost)
+          : undefined,
       };
     });
   }, [meals, dishes]);
@@ -294,7 +304,7 @@ export default function App() {
     }
   };
 
-  const handleAddDish = async (name: string, cost: number, price?: number) => {
+  const handleAddDish = async (name: string, cost: number, price?: number, category?: DishCategory) => {
     if (useApi) {
       try {
         // API模式：检查重复
@@ -316,7 +326,7 @@ export default function App() {
           if (!confirmed) return;
         }
 
-        const newDish = await dishesApi.create({ name, cost, price });
+        const newDish = await dishesApi.create({ name, cost, price, category });
         setDishes([newDish, ...dishes]);
       } catch (err: any) {
         alert(`创建菜品失败: ${err.message}`);
@@ -344,7 +354,8 @@ export default function App() {
         id: Date.now().toString(),
         name,
         cost,
-        price
+        price,
+        categoryName: category,
       };
       setDishes([newDish, ...dishes]);
       setHasUnsavedChanges(true);
@@ -764,6 +775,19 @@ export default function App() {
     exportMealTemplate();
   };
 
+  // 处理单品套餐创建成功后的回调
+  const handleSingleDishMealCreated = async () => {
+    // 重新加载套餐列表
+    if (useApi) {
+      try {
+        const mealsData = await mealsApi.getAll();
+        setMeals(mealsData);
+      } catch (err: any) {
+        console.error('重新加载套餐列表失败:', err);
+      }
+    }
+  };
+
   return (
     <div className="app-container">
       {/* Header */}
@@ -846,6 +870,7 @@ export default function App() {
               onAddDish={handleAddDish}
               onDeleteDish={handleDeleteDish}
               onUpdateDish={handleUpdateDish}
+              onSingleDishMealCreated={handleSingleDishMealCreated}
             />
           </div>
         ) : (

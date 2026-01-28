@@ -119,6 +119,52 @@ export class MealService {
   }
 
   /**
+   * 创建单品套餐
+   */
+  createSingleDishMeal(dishId: string, name?: string): MealPlan | null {
+    // 获取菜品信息
+    const dish = dishService.getById(dishId);
+    if (!dish) {
+      return null;
+    }
+
+    const id = Date.now().toString();
+    const now = getCurrentTimestamp();
+    const mealName = name || dish.name;
+
+    // 单品套餐的价格 = 菜品价格
+    const standardPrice = dish.price || dish.cost * 1.5;
+    const promoPrice1 = dish.cost * 1.2;
+
+    executeUpdate(
+      `INSERT INTO meal_plans (id, name, standard_price, promo_price1, promo_price2, sort_order, is_single_dish, sync_dish_id, created_at, updated_at, source)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, 'user')`,
+      [
+        id,
+        mealName,
+        standardPrice,
+        promoPrice1,
+        null,
+        0,
+        dishId,
+        now,
+        now,
+      ]
+    );
+
+    // 插入菜品关联
+    const relationId = `${id}-${dishId}-0`;
+    executeUpdate(
+      'INSERT INTO meal_dishes (id, meal_id, dish_id, dish_order, created_at) VALUES (?, ?, ?, ?, ?)',
+      [relationId, id, dishId, 0, now]
+    );
+
+    saveDatabase();
+
+    return this.getById(id)!;
+  }
+
+  /**
    * 更新套餐
    */
   update(id: string, data: UpdateMealRequest): MealPlan | null {

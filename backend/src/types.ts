@@ -31,7 +31,7 @@ export interface MealPlan {
   name: string;
   standard_price: number;
   promo_price1: number;
-  promo_price2?: number;
+  promo_price2?: number; // 官方补贴金额（可选）
   sort_order: number;
   created_at: number;
   updated_at: number;
@@ -39,6 +39,9 @@ export interface MealPlan {
   source: 'initial' | 'user';
   dishIds?: string[];
   dishes?: Dish[];
+  // 单品套餐相关字段
+  is_single_dish?: boolean; // 是否为单品套餐
+  sync_dish_id?: string; // 关联的菜品ID（仅单品套餐）
 }
 
 // 套餐菜品关联
@@ -112,6 +115,12 @@ export interface CreateMealRequest {
   promo_price1: number;
   promo_price2?: number;
   sort_order?: number;
+}
+
+// 创建单品套餐请求
+export interface CreateSingleDishMealRequest {
+  dish_id: string; // 基于哪个菜品创建
+  name?: string; // 可选的套餐名称，默认使用菜品名称
 }
 
 // 更新套餐请求

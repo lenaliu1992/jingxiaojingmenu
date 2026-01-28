@@ -15,11 +15,13 @@ interface ExcelRowBase {
   秒杀毛利率1: string;
 }
 
-// Excel 行数据接口（包含秒杀价2）
+// Excel 行数据接口（包含官方补贴金额）
 interface ExcelRowWithPromo2 extends ExcelRowBase {
   序号: number;  // 新增：序号列
-  秒杀价2: string;
-  秒杀毛利率2: string;
+  官方补贴金额: string;  // 原：秒杀价2
+  补贴后毛利率: string;   // 原：秒杀毛利率2
+  最终到手价: string;     // 新增
+  最终毛利率: string;     // 新增
 }
 
 // Excel 行数据类型（联合类型）
@@ -69,15 +71,25 @@ const transformMealsToExcelRows = (
         秒杀毛利率1: `${(meal.promoMargin1 || 0).toFixed(2)}%`,
       };
 
-      // 根据是否需要秒杀价2来决定添加哪些字段
+      // 根据是否需要官方补贴金额来决定添加哪些字段
       if (hasAnyPromoPrice2) {
+        const finalPrice = meal.promoPrice2 !== undefined
+          ? meal.promoPrice1 - meal.promoPrice2
+          : undefined;
+
         rows.push({
           ...baseRow,
-          秒杀价2: meal.promoPrice2 !== undefined && meal.promoPrice2 !== null
+          官方补贴金额: meal.promoPrice2 !== undefined && meal.promoPrice2 !== null
             ? `¥${meal.promoPrice2.toFixed(2)}`
             : '-',
-          秒杀毛利率2: meal.promoPrice2 !== undefined && meal.promoPrice2 !== null && meal.promoMargin2 !== undefined && meal.promoMargin2 !== null
+          补贴后毛利率: meal.promoPrice2 !== undefined && meal.promoPrice2 !== null && meal.promoMargin2 !== undefined && meal.promoMargin2 !== null
             ? `${meal.promoMargin2.toFixed(2)}%`
+            : '-',
+          最终到手价: finalPrice !== undefined
+            ? `¥${finalPrice.toFixed(2)}`
+            : '-',
+          最终毛利率: meal.finalMargin !== undefined && meal.finalMargin !== null
+            ? `${meal.finalMargin.toFixed(2)}%`
             : '-',
         } as ExcelRowWithPromo2);
       } else {
@@ -127,7 +139,7 @@ export const exportToExcel = (meals: MealPlanAnalysis[], dishes: Dish[]) => {
       const fieldName = headerCell.v;
 
       // 设置价格列的格式（数字格式，保留2位小数）
-      if (['菜品单价', '菜品成本', '菜品小计', '套餐原价', '秒杀价1', '秒杀价2'].includes(fieldName)) {
+      if (['菜品单价', '菜品成本', '菜品小计', '套餐原价', '秒杀价1', '官方补贴金额', '最终到手价'].includes(fieldName)) {
         // 如果是数据行（不是表头）
         if (row > 0 && typeof cell.v === 'string') {
           // 移除 ¥ 符号并转换为数字
@@ -163,12 +175,12 @@ export const exportToExcel = (meals: MealPlanAnalysis[], dishes: Dish[]) => {
     if (mealRowCount > 1) {
       const endRow = startRow + mealRowCount - 1;
 
-      // 根据是否有秒杀价2来决定要合并的列索引
+      // 根据是否有官方补贴金额来决定要合并的列索引
       // 0-序号, 1-套餐名称, 7-套餐原价, 8-秒杀价1, 9-毛利率1
-      // 如果有秒杀价2：10-秒杀价2, 11-毛利率2
+      // 如果有官方补贴金额：10-官方补贴金额, 11-补贴后毛利率, 12-最终到手价, 13-最终毛利率
       const columnsToMerge = hasAnyPromoPrice2
-        ? [0, 1, 7, 8, 9, 10, 11]  // 包含序号列（索引0）
-        : [0, 1, 7, 8, 9];          // 包含序号列（索引0）
+        ? [0, 1, 7, 8, 9, 10, 11, 12, 13]  // 包含序号列（索引0）+ 新增2列
+        : [0, 1, 7, 8, 9];                   // 包含序号列（索引0）
 
       columnsToMerge.forEach(colIndex => {
         merges.push({
@@ -197,8 +209,10 @@ export const exportToExcel = (meals: MealPlanAnalysis[], dishes: Dish[]) => {
         { wch: 12 }, // 套餐原价
         { wch: 12 }, // 秒杀价1
         { wch: 12 }, // 毛利率1
-        { wch: 12 }, // 秒杀价2
-        { wch: 12 }, // 毛利率2
+        { wch: 14 }, // 官方补贴金额（原：秒杀价2）
+        { wch: 14 }, // 补贴后毛利率（原：毛利率2）
+        { wch: 14 }, // 最终到手价（新增）
+        { wch: 14 }, // 最终毛利率（新增）
       ]
     : [
         { wch: 8 },   // 序号（新增，第一列）
@@ -249,10 +263,10 @@ const fillMergedCells = (rows: any[], hasPromoPrice2Column: boolean): any[] => {
       row.套餐原价 = currentMealInfo.套餐原价 || 0;
       row.秒杀价1 = currentMealInfo.秒杀价1 || 0;
       row.秒杀毛利率1 = currentMealInfo.秒杀毛利率1 || 0;
-      // 只有当Excel中有秒杀价2列时才填充
+      // 只有当Excel中有官方补贴金额列时才填充
       if (hasPromoPrice2Column) {
-        row.秒杀价2 = currentMealInfo.秒杀价2 || 0;
-        row.秒杀毛利率2 = currentMealInfo.秒杀毛利率2 || 0;
+        row.官方补贴金额 = currentMealInfo.官方补贴金额 || 0;
+        row.补贴后毛利率 = currentMealInfo.补贴后毛利率 || 0;
       }
     } else {
       // 新套餐，更新当前套餐信息
@@ -262,10 +276,10 @@ const fillMergedCells = (rows: any[], hasPromoPrice2Column: boolean): any[] => {
         秒杀价1: row.秒杀价1,
         秒杀毛利率1: row.秒杀毛利率1,
       };
-      // 只有当Excel中有秒杀价2列时才记录
+      // 只有当Excel中有官方补贴金额列时才记录
       if (hasPromoPrice2Column) {
-        currentMealInfo.秒杀价2 = row.秒杀价2;
-        currentMealInfo.秒杀毛利率2 = row.秒杀毛利率2;
+        currentMealInfo.官方补贴金额 = row.官方补贴金额;
+        currentMealInfo.补贴后毛利率 = row.补贴后毛利率;
       }
     }
     result.push(row);
@@ -339,8 +353,9 @@ export const importFromExcel = async (
       };
     }
 
-    // 2. 检测是否有秒杀价2列
-    const hasPromoPrice2Column = rawData.length > 0 && '秒杀价2' in rawData[0];
+    // 2. 检测是否有官方补贴金额列（兼容旧的"秒杀价2"列名）
+    const hasPromoPrice2Column = rawData.length > 0 &&
+      ('官方补贴金额' in rawData[0] || '秒杀价2' in rawData[0]);
 
     // 3. 处理合并单元格
     const filledRows = fillMergedCells(rawData, hasPromoPrice2Column);
@@ -363,10 +378,12 @@ export const importFromExcel = async (
       const promoPrice1 = parsePrice(firstRow.秒杀价1);
       const standardPrice = parsePrice(firstRow.套餐原价);
 
-      // 条件读取秒杀价2：只有当Excel中有这一列且值大于0时才保存
+      // 条件读取官方补贴金额：只有当Excel中有这一列且值大于0时才保存（兼容新旧列名）
       let promoPrice2: number | undefined = undefined;
       if (hasPromoPrice2Column) {
-        const parsedValue = parsePrice(firstRow.秒杀价2);
+        // 优先使用新列名，如果没有则使用旧列名
+        const subsidyValue = firstRow.官方补贴金额 || firstRow.秒杀价2;
+        const parsedValue = parsePrice(subsidyValue);
         promoPrice2 = parsedValue > 0 ? parsedValue : undefined;
       }
 

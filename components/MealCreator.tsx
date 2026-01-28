@@ -304,10 +304,10 @@ export const MealCreator: React.FC<MealCreatorProps> = ({ dishes, initialData, o
                   </div>
                 </div>
 
-                {/* Promo Price 2 */}
+                {/* Promo Price 2 - 官方补贴金额 */}
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
                    <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/10 rounded-bl-full -mr-8 -mt-8"></div>
-                  <label className="block text-sm font-bold text-amber-700 mb-2">秒杀价 2（可选）</label>
+                  <label className="block text-sm font-bold text-amber-700 mb-2">官方补贴金额（可选）</label>
                   <div className="flex gap-4 items-center">
                     <div className="flex-1 relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">¥</span>
@@ -326,20 +326,21 @@ export const MealCreator: React.FC<MealCreatorProps> = ({ dishes, initialData, o
                           }
                         }}
                         className="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-lg focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none"
-                        placeholder="留空表示不设置"
+                        placeholder="留空表示无补贴"
                       />
                     </div>
                     <div className="text-right flex flex-col gap-1">
                       {promoPrice2 !== undefined && promoPrice2 !== '' ? (
                         <>
-                          <span className={`text-xl font-bold font-mono ${calculateMargin(promoPrice2) < 15 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                            {calculateMargin(promoPrice2).toFixed(1)}%
+                          <span className={`text-xl font-bold font-mono ${calculateMargin((typeof promoPrice1 === 'number' ? promoPrice1 : 0) - (typeof promoPrice2 === 'number' ? promoPrice2 : 0)) < 15 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                            {calculateMargin(
+                              (typeof promoPrice1 === 'number' ? promoPrice1 : 0) -
+                              (typeof promoPrice2 === 'number' ? promoPrice2 : 0)
+                            ).toFixed(1)}%
                           </span>
-                          {promoPrice2 && totalOriginalPrice > 0 && (
-                            <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                              {calculateDiscount(promoPrice2).toFixed(1)}折
-                            </span>
-                          )}
+                          <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                            官方补贴后毛利率
+                          </span>
                         </>
                       ) : (
                         <span className="text-sm text-slate-400 italic">
@@ -349,6 +350,35 @@ export const MealCreator: React.FC<MealCreatorProps> = ({ dishes, initialData, o
                     </div>
                   </div>
                 </div>
+
+                {/* 最终到手价显示（计算字段） */}
+                {promoPrice1 && promoPrice2 !== undefined && promoPrice2 !== '' && (
+                  <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/10 rounded-bl-full -mr-8 -mt-8"></div>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-sm font-bold text-emerald-700">最终到手价</span>
+                        <span className="block text-xs text-slate-500">
+                          = 秒杀价1 - 官方补贴金额
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-2xl font-bold font-mono text-emerald-600">
+                          ¥{(
+                            (typeof promoPrice1 === 'number' ? promoPrice1 : 0) -
+                            (typeof promoPrice2 === 'number' ? promoPrice2 : 0)
+                          ).toFixed(2)}
+                        </span>
+                        <span className="block text-xs text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded mt-1">
+                          毛利率：{calculateMargin(
+                            (typeof promoPrice1 === 'number' ? promoPrice1 : 0) -
+                            (typeof promoPrice2 === 'number' ? promoPrice2 : 0)
+                          ).toFixed(1)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
               </div>
             </div>

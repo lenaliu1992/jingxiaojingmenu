@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from 'dotenv';
 import { initDatabase, closeDatabase } from './config/database.js';
 import { migrateAddCategories } from './database/migrations/add_categories.js';
+import { migrateAddSingleDishMeal } from './database/migrations/add_single_dish_meal.js';
 import apiRouter from './routes/index.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
@@ -48,6 +49,12 @@ async function startServer() {
       await migrateAddCategories();
     } catch (error: any) {
       console.log('⚠️ 分类迁移已运行或失败:', error.message);
+    }
+
+    try {
+      await migrateAddSingleDishMeal();
+    } catch (error: any) {
+      console.log('⚠️ 单品套餐迁移已运行或失败:', error.message);
     }
 
     // 启动 HTTP 服务器

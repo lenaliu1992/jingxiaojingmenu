@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { dishService } from '../services/dishesService.js';
+import { CategoryService } from '../services/categoriesService.js';
+import { mealService } from '../services/mealsService.js';
 import { CreateDishRequest, UpdateDishRequest, ApiResponse, BatchImportRequest } from '../types.js';
 
 const router = Router();
@@ -59,7 +61,7 @@ router.get('/:id', (req: Request, res: Response) => {
 // 创建菜品
 router.post('/', (req: Request, res: Response) => {
   try {
-    const data: CreateDishRequest = req.body;
+    const data: CreateDishRequest & { category?: string } = req.body;
 
     // 验证
     if (!data.name || typeof data.name !== 'string') {
@@ -82,7 +84,23 @@ router.post('/', (req: Request, res: Response) => {
       });
     }
 
-    const dish = dishService.create(data);
+    // 如果提供了category（分类名称），查找对应的category_id
+    let categoryId = undefined;
+    if (data.category) {
+      const categoryService = new CategoryService();
+      const categories = categoryService.getAll();
+      const category = categories.find((c: any) => c.name === data.category);
+      if (category) {
+        categoryId = category.id;
+      }
+    }
+
+    const dish = dishService.create({
+      name: data.name,
+      cost: data.cost,
+      price: data.price,
+      category_id: categoryId,
+    });
 
     res.status(201).json({ success: true, data: dish });
   } catch (error: any) {
@@ -256,6 +274,35 @@ router.post('/batch/import', (req: Request, res: Response) => {
       success: false,
       error: {
         code: 'BATCH_IMPORT_FAILED',
+        message: error.message,
+      },
+    });
+  }
+});
+
+// 为菜品创建单品套餐
+router.post('/:id/create-single-dish-meal', (req: Request, res: Response) => {
+  try {
+    const { name } = req.body;
+
+    const meal = mealService.createSingleDishMeal(req.params.id, name);
+
+    if (!meal) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: 'DISH_NOT_FOUND',
+          message: '菜品不存在',
+        },
+      });
+    }
+
+    res.status(201).json({ success: true, data: meal });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'CREATE_SINGLE_DISH_MEAL_FAILED',
         message: error.message,
       },
     });

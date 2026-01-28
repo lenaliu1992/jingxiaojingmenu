@@ -80,7 +80,26 @@ function SortableMealItem({
         </button>
 
         <div className="meal-info">
-          <h3 className="meal-name">{meal.name}</h3>
+          <h3 className="meal-name">
+            {meal.name}
+            {meal.isSingleDish && (
+              <span
+                style={{
+                  marginLeft: '8px',
+                  padding: '2px 8px',
+                  fontSize: '12px',
+                  fontWeight: 'normal',
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  borderRadius: '12px',
+                  display: 'inline-block'
+                }}
+                title="单品套餐"
+              >
+                🍱 单品
+              </span>
+            )}
+          </h3>
           <div className="meal-meta">
             <span className="dish-count">{meal.dishIds.length} 道菜</span>
           </div>
@@ -88,19 +107,21 @@ function SortableMealItem({
 
         <div className="meal-pricing">
           <div className="price-group">
-            <span className="price-label">原价</span>
-            <span className="price-value">
-              ¥{meal.standardPrice > 0 ? meal.standardPrice : meal.totalOriginalPrice.toFixed(0)}
-            </span>
-          </div>
-          <div className="price-group">
-            <span className="price-label">秒杀</span>
+            <span className="price-label">秒杀价</span>
             <span className="price-value price-accent">¥{meal.promoPrice1}</span>
           </div>
-          {meal.promoPrice2 && (
+          {meal.promoPrice2 !== undefined && meal.promoPrice2 > 0 && (
             <div className="price-group">
-              <span className="price-label">特价</span>
-              <span className="price-value price-special">¥{meal.promoPrice2}</span>
+              <span className="price-label">官方补贴</span>
+              <span className="price-value price-special">-¥{meal.promoPrice2}</span>
+            </div>
+          )}
+          {meal.finalPrice !== undefined && (
+            <div className="price-group">
+              <span className="price-label" style={{ color: '#10b981' }}>最终到手</span>
+              <span className="price-value" style={{ color: '#10b981', fontWeight: 'bold' }}>
+                ¥{meal.finalPrice.toFixed(0)}
+              </span>
             </div>
           )}
         </div>
@@ -152,11 +173,11 @@ function SortableMealItem({
                 {meal.promoMargin1.toFixed(1)}%
               </span>
             </div>
-            {meal.promoMargin2 !== undefined && (
+            {meal.finalMargin !== undefined && (
               <div className="detail-item">
-                <span className="detail-label">特价毛利率</span>
-                <span className={`detail-value margin-${getMarginClass(meal.promoMargin2)}`}>
-                  {meal.promoMargin2.toFixed(1)}%
+                <span className="detail-label">最终到手毛利率</span>
+                <span className={`detail-value margin-${getMarginClass(meal.finalMargin)}`}>
+                  {meal.finalMargin.toFixed(1)}%
                 </span>
               </div>
             )}

@@ -1,14 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Trash2, Search, Edit, X, Check, Filter, Settings } from 'lucide-react';
-import { Dish, DishCategory, DISH_CATEGORIES, DishCategoryData } from '../types';
+import { Plus, Trash2, Search, Edit, X, Check, Filter, Settings, Package } from 'lucide-react';
+import { Dish, DishCategory, DISH_CATEGORIES, DishCategoryData, MealPlan } from '../types';
 import { CategoryManagementDialog } from './CategoryManagementDialog';
 import { categoriesApi } from '../services/api/categoriesApi';
+import { dishesApi } from '../services/api/dishesApi';
 
 interface DishLibraryProps {
   dishes: Dish[];
   onAddDish: (name: string, cost: number, price?: number, category?: DishCategory) => void;
   onDeleteDish: (id: string) => void;
   onUpdateDish: (id: string, name: string, cost: number, price?: number, category?: DishCategory) => void;
+  onSingleDishMealCreated?: () => void; // 新增：单品套餐创建成功后的回调
 }
 
 export const DishLibraryNew: React.FC<DishLibraryProps> = ({
@@ -16,6 +18,7 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
   onAddDish,
   onDeleteDish,
   onUpdateDish,
+  onSingleDishMealCreated,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<DishCategory | 'all'>('all');
@@ -160,6 +163,18 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
     );
 
     setNewDish({ name: '', cost: '', price: '', category: '其他' });
+  };
+
+  // 创建单品套餐
+  const handleCreateSingleDishMeal = async (dish: Dish) => {
+    try {
+      const meal = await dishesApi.createSingleDishMeal(dish.id, dish.name);
+      // 触发回调以更新套餐列表
+      onSingleDishMealCreated?.();
+    } catch (error: any) {
+      console.error('创建单品套餐失败:', error);
+      alert('创建单品套餐失败：' + (error.message || '未知错误'));
+    }
   };
 
   return (
@@ -513,6 +528,13 @@ export const DishLibraryNew: React.FC<DishLibraryProps> = ({
                                 title="编辑"
                               >
                                 <Edit size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleCreateSingleDishMeal(dish)}
+                                className="btn btn-icon btn-ghost"
+                                title="创建单品套餐"
+                              >
+                                <Package size={16} />
                               </button>
                               <button
                                 onClick={() => onDeleteDish(dish.id)}
